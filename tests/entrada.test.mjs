@@ -77,6 +77,39 @@ test('el mismo qrValue va a las tres', () => {
     'el componente calcula un valor de QR propio en vez de usar el que recibe');
 });
 
+/* La prueba de arriba mira el COMPONENTE: que reparta el mismo `qrValue` a las
+ * tres. Pero que lo reparta no sirve de nada si el que lo recibe lo ignora, y
+ * eso es exactamente lo que hacía la tarjeta: `tarjetaPng` no tenía parámetro
+ * de QR y se lo sacaba del ticket por su cuenta (`ticket.qr_token || …`).
+ *
+ * No se veía porque hoy los dos valores coinciden en todas las pantallas. Se
+ * habría visto el día que alguien pasara un `qrValue` distinto —una pieza
+ * configurada para imprimir el código corto en vez del token, que es una
+ * opción que ya existe en `lib/piezasBranding.js`—: tarjeta con un QR y PDF
+ * con otro, para la misma boleta. La misma forma de fallo que la escarapela
+ * que no abría la puerta, esperando a que alguien usara una opción legítima.
+ */
+test('las tres salidas HACEN CASO al qrValue que reciben', () => {
+  const salidas = [
+    ['src/lib/boletaPdf.jsx', 'descargarBoletaPdf'],
+    ['src/lib/tarjetaPng.jsx', 'tarjetaPng'],
+  ];
+  for (const [archivo, fn] of salidas) {
+    const src = leer(archivo);
+    assert.match(src, /qrValue/,
+      `${fn} no recibe el valor del QR: se lo calcula por su cuenta`);
+    /* Y que lo use ANTES de caer al ticket, no después ni en su lugar. */
+    assert.match(src, /qr(Value|Pedido)\s*\|\|\s*ticket\./,
+      `${fn} recibe un qrValue pero no lo antepone a lo que traiga el ticket`);
+  }
+
+  /* `descargarQrPng` recibe el valor como primer argumento, así que no tiene
+     de dónde sacar otro: no hay nada que comprobarle. */
+  const comp = leer(COMPONENTE);
+  assert.match(comp, /descargarTarjetaPng\(\{[^}]*qrValue/s,
+    'el componente no le pasa el qrValue a la tarjeta');
+});
+
 test('el PDF acepta el diseño del organizador', () => {
   /* Era la única de las tres salidas que ignoraba la marca: un evento con
      White Label entregaba un PDF gris. Y es el archivo que más se reenvía. */

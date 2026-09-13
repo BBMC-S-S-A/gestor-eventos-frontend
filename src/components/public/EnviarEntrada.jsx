@@ -95,7 +95,10 @@ export default function EnviarEntrada({ evento = {}, ticket = {}, qrValue, class
       if (typeof navigator.canShare === 'function') {
         try {
           const design = walletConfig(evento.page_json, { publico: 'asistentes', tipo: ticket.tipo?.nombre });
-          const dataUrl = await tarjetaPng({ design, evento, ticket: { ...ticket, qr_token: qrValue } });
+          /* `qrValue` va como tal y no disfrazado de `qr_token` dentro de una
+             copia del ticket: era la única forma de decirle a la tarjeta qué
+             imprimir antes de que aceptara el valor de frente. */
+          const dataUrl = await tarjetaPng({ design, evento, ticket, qrValue });
           if (dataUrl) {
             const blob = await (await fetch(dataUrl)).blob();
             const f = new File([blob], `entrada-${ticket.codigo}.png`, { type: 'image/png' });
