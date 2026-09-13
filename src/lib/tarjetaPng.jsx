@@ -90,7 +90,18 @@ function recortar(ctx, texto, maxAncho) {
 }
 
 /* Dibuja la tarjeta y devuelve el data URL, o null si algo impidió generarla. */
-export async function tarjetaPng({ design, evento = {}, ticket = {} }, ancho = 1600) {
+/* `qrValue` manda sobre lo que traiga el ticket.
+ *
+ * Las tres salidas de una entrada —PDF, tarjeta y QR suelto— tienen que
+ * imprimir EL MISMO código, y quien lo decide es `DescargarEntrada`, que las
+ * pide las tres. El PDF y el QR suelto ya recibían ese valor; la tarjeta no, y
+ * se lo sacaba del ticket por su cuenta. Hoy coinciden en todos los sitios que
+ * la llaman, así que no se ve — pero el primero que pase un `qrValue` distinto
+ * (una pieza configurada para imprimir el código corto en vez del token, por
+ * ejemplo: `lib/piezasBranding.js`) se llevaría una tarjeta con un QR y un PDF
+ * con otro, para la misma boleta. Que es justo lo que ese componente existe
+ * para que no pase. */
+export async function tarjetaPng({ design, evento = {}, ticket = {}, qrValue: qrPedido = null }, ancho = 1600) {
   const d = { ...WALLET_DEFECTO, ...(design || {}) };
   const W = ancho;
   const H = Math.round(ancho / RATIO);
@@ -109,7 +120,7 @@ export async function tarjetaPng({ design, evento = {}, ticket = {} }, ancho = 1
   const nombre = ticket.guest_nombre || ticket.nombre || 'Asistente';
   const tipo = ticket.tipo?.nombre || ticket.ticket_nombre
     || (typeof ticket.tipo === 'string' ? ticket.tipo : '') || 'General';
-  const qrValue = ticket.qr_token || ticket.codigo || ticket.qr || '';
+  const qrValue = qrPedido || ticket.qr_token || ticket.codigo || ticket.qr || '';
   const marca = evento.page_json?.branding?.plataforma || evento.organizador?.empresa
     || evento.titulo || 'GESTEK';
 

@@ -97,7 +97,9 @@ export default function DescargarEntrada({
   const descargarTarjeta = async () => {
     setBajandoTarjeta(true);
     try {
-      const ok = await descargarTarjetaPng({ design, evento, ticket }, `tarjeta-${ticket.codigo}`);
+      /* El mismo `qrValue` que el PDF y el QR suelto: las tres salidas son la
+         misma entrada, y aquí es donde se decide una sola vez. */
+      const ok = await descargarTarjetaPng({ design, evento, ticket, qrValue }, `tarjeta-${ticket.codigo}`);
       if (!ok) alert('No se pudo generar la imagen de la tarjeta. Descargá la boleta en PDF, que lleva el QR dentro.');
     } finally { setBajandoTarjeta(false); }
   };
