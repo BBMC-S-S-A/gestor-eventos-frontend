@@ -41,6 +41,7 @@ import AutomatizacionesSection from './AutomatizacionesSection.jsx';
 import IntegracionesSection from './IntegracionesSection.jsx';
 import RankingTab        from '../tabs/RankingTab.jsx';
 import TicketsTab        from '../tabs/TicketsTab.jsx';
+import DerechosTab       from '../tabs/DerechosTab.jsx';
 import PlanoTab          from '../tabs/PlanoTab.jsx';
 import AnalyticsTab      from '../tabs/AnalyticsTab.jsx';
 import ClientesTab       from '../tabs/ClientesTab.jsx';
@@ -188,6 +189,11 @@ const SECCIONES = [
      antes que «Pagos» — el resultado se lee, no se explica. */
   { id: 'comercial', label: 'Entradas y dinero', icon: WalletIcon, tabs: [
     { id: 'boletas',      label: 'Boletas',           perm: 'gestionar_tickets' },
+    /* Lo que la boleta INCLUYE y alguien reparte: refrigerios, almuerzos,
+       kits, parqueadero (0126). Va junto a las boletas y no en Asistentes
+       porque es configuración de lo que se vende, y lo decide quien pone los
+       precios. Repartirlo se hace en «Escanear». */
+    { id: 'derechos',     label: 'Lo que incluye',    perm: 'gestionar_tickets' },
     /* Para eventos donde se compra un sitio concreto —silla, mesa, palco—. Va
        junto a Boletas porque el plano y el precio son la misma decisión: una
        localidad ES un tipo de boleta sobre un conjunto de espacios. */
@@ -209,7 +215,12 @@ const SECCIONES = [
        Es el único sitio donde se pasa una escarapela por un móvil —entrada,
        reingreso, sub-evento, puntos y canje—, y llamarlo por la primera de
        las cinco cosas mandaba a buscar las otras cuatro a otra pantalla. */
-    { id: 'checkin',      label: 'Escanear',  perm: 'checkin' },
+    /* Los dos permisos: `checkin` abre los cinco modos de ingreso y puntos, y
+       `entregar` (0126) el sexto —repartir el almuerzo, el kit, el
+       parqueadero—. Van separados porque quien sirve la comida no tiene por
+       qué poder abrir la puerta del evento, y a menudo es otra empresa; la
+       pantalla comprueba dentro qué modos puede usar cada quien. */
+    { id: 'checkin',      label: 'Escanear',  perm: ['checkin', 'entregar'] },
     /* Los dos permisos, no uno: la escarapela la imprime quien está en la
        puerta y el carné lo diseña quien lleva los clientes. La pantalla
        comprueba dentro cuál de las dos vistas puede ver cada quien. */
@@ -746,6 +757,7 @@ function Contenido({ seccion, tab, evento, soyOwner, reload, permisos, onAnuncio
     case 'zonas/accesos'          : return <AccesosSection evento={evento} />;
     case 'actividades/ranking'          : return <RankingTab evento={evento} />;
     case 'comercial/boletas'        : return <TicketsTab evento={evento} />;
+    case 'comercial/derechos'       : return <DerechosTab evento={evento} />;
     case 'comercial/plano'          : return <PlanoTab evento={evento} recargarEvento={reload} />;
     case 'comercial/pagos'          : return <PagosSection evento={evento} reload={reload} />;
     case 'comercial/dinero'         : return <DineroSection evento={evento} />;
@@ -757,7 +769,7 @@ function Contenido({ seccion, tab, evento, soyOwner, reload, permisos, onAnuncio
        ofrecerlo. Quien manda sigue siendo la ruta. */
     case 'asistentes/clientes'      : return <ClientesTab evento={evento}
                                         puedeBorrar={puedeVer('borrar_boletas', soyOwner, permisos)} />;
-    case 'asistentes/checkin'       : return <CheckinTab evento={evento} miRolId={miRolId} miUserId={miUserId} />;
+    case 'asistentes/checkin'       : return <CheckinTab evento={evento} miRolId={miRolId} miUserId={miUserId} permisos={permisos} soyOwner={soyOwner} />;
     /* Esta pantalla toca tres cosas con tres permisos distintos (la zona, la
        agenda y los stands), así que recibe la lista y decide ella: la regla de
        cada acción vive junto a la acción. */
