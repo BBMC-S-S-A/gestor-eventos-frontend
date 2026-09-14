@@ -166,7 +166,10 @@ function StandsEditor({ evento, gestiona }) {
   const cargar = useCallback(async () => {
     setLoading(true);
     try {
-      const d = await networkingApi.expositoresAdmin(evento.id);
+      /* Sólo los que de verdad tienen mesa/stand (rol 'comprador'): un
+         'vendedor' de la rueda de negocios no monta el suyo, y antes esta
+         pantalla los mezclaba a todos. */
+      const d = await networkingApi.expositoresAdmin(evento.id, true);
       setStands(d.expositores || []);
       /* El servidor dice si la vista `v_consumo_puntos_stand` está en la base.
          Sin ella, `puntos` viene vacío en todas las tarjetas y la pantalla se

@@ -85,7 +85,10 @@ export default function MapaSection({ evento }) {
 
   useEffect(() => {
     Promise.all([
-      networkingApi.expositoresAdmin(evento.id).catch(() => ({ expositores: [] })),
+      /* Sólo los que de verdad tienen mesa/stand (rol 'comprador'): un
+         'vendedor' de la rueda de negocios no tiene ubicación fija que
+         colocar en el plano. */
+      networkingApi.expositoresAdmin(evento.id, true).catch(() => ({ expositores: [] })),
       agendaApi.sessions(evento.id).catch(() => ({ sessions: [] })),
     ]).then(([ex, ag]) => { setExpositores(ex.expositores || []); setSesiones(ag.sessions || []); });
   }, [evento.id]);

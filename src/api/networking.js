@@ -19,8 +19,13 @@ export const networkingApi = {
   /* Que salio de la rueda: el informe que la camara le enseña a su junta. */
   informe     : (eventoId) => client.get(`/eventos/${eventoId}/networking/informe`).then(r => r.data),
 
-  /* Vista del organizador */
-  expositoresAdmin: (eventoId) => client.get(`/eventos/${eventoId}/expositores`).then(r => r.data),
+  /* Vista del organizador
+     `soloConMesa`: sólo los expositores con rol 'comprador' (los que de
+     verdad tienen mesa/stand). Úsalo donde se enseña o edita el STAND —el
+     mapa, la lista de stands—, no donde hace falta la rueda completa (el
+     formulario de sub-eventos, por ejemplo, sigue viendo a todos). */
+  expositoresAdmin: (eventoId, soloConMesa = false) =>
+    client.get(`/eventos/${eventoId}/expositores`, { params: soloConMesa ? { rol: 'comprador' } : {} }).then(r => r.data),
   crearStand      : (eventoId, body) => client.post(`/eventos/${eventoId}/expositores`, body).then(r => r.data),
   editarStand     : (eventoId, id, body) => client.patch(`/eventos/${eventoId}/expositores/${id}`, body).then(r => r.data),
   borrarStand     : (eventoId, id) => client.delete(`/eventos/${eventoId}/expositores/${id}`).then(r => r.data),

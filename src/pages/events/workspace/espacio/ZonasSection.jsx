@@ -210,7 +210,9 @@ export default function ZonasSection({ evento, soyOwner = false, permisos, reloa
   const cargarAsignables = useCallback(async () => {
     const [ag, st] = await Promise.all([
       puedeAgenda ? agendaApi.sessions(evento.id).catch(() => null) : Promise.resolve(null),
-      puedeStands ? networkingApi.expositoresAdmin(evento.id).catch(() => null) : Promise.resolve(null),
+      /* Sólo los que de verdad tienen mesa/stand (rol 'comprador'): un
+         'vendedor' no tiene stand propio que colgar de una zona. */
+      puedeStands ? networkingApi.expositoresAdmin(evento.id, true).catch(() => null) : Promise.resolve(null),
     ]);
     if (!vivoRef.current) return;
     if (ag) setAgendaTodo(ag.sessions || []);
