@@ -116,6 +116,8 @@ export default function AcreditadosTab({ evento }) {
         )}
       </div>
 
+      <Dentro evento={evento} />
+
       <div className="flex items-center gap-3 flex-wrap">
         <input value={q} onChange={e => setQ(e.target.value)}
           placeholder="Nombre, documento o boleta" className="input !h-9 text-sm w-64" />
@@ -146,6 +148,73 @@ export default function AcreditadosTab({ evento }) {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ─────────── Quién no ha salido ─────────── */
+
+/* A las ocho de la noche esto vale más que la lista de a quién se dejó entrar.
+ *
+ * Se pinta arriba y sólo cuando hay alguien dentro: el resto del día es una
+ * caja vacía que estorba, y el día del montaje es lo primero que se mira. */
+function Dentro({ evento }) {
+  const [dentro, setDentro] = useState([]);
+  const [cerrando, setCerrando] = useState(false);
+  const { success, error: toastErr } = useToast();
+
+  const cargar = () => {
+    acreditadosApi.dentro(evento.id)
+      .then(d => setDentro(d.dentro || []))
+      /* En silencio: es un panel de apoyo. Si falla, la lista de abajo —que es
+         a lo que se viene— sigue funcionando, y un error rojo aquí taparía la
+         pantalla entera por un contador. */
+      .catch(() => {});
+  };
+
+  useEffect(cargar, /* eslint-disable-line */ [evento.id]);
+
+  const cerrar = async () => {
+    const ok = await confirmDialog({
+      title: `Cerrar la jornada con ${dentro.length} dentro`,
+      message: 'Se marca la salida de todos los que siguen dentro. Queda anotado que fue un cierre '
+             + 'a mano y no un escaneo, con tu nombre.',
+      confirmText: 'Cerrar jornada',
+    });
+    if (!ok) return;
+    setCerrando(true);
+    try {
+      const r = await acreditadosApi.cerrarJornada(evento.id);
+      success(`${r.cerrados} salidas registradas.`);
+      cargar();
+    } catch (e) { toastErr(e.response?.data?.error || e.message); }
+    finally     { setCerrando(false); }
+  };
+
+  if (!dentro.length) return null;
+
+  return (
+    <div className="rounded-2xl border border-primary/30 bg-primary/5 p-4 space-y-3">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="font-medium text-text-1">{dentro.length} dentro ahora</p>
+          <p className="text-xs text-text-3">
+            Personas acreditadas que entraron y todavía no han marcado salida.
+          </p>
+        </div>
+        <button className="btn btn-secondary btn-sm" disabled={cerrando} onClick={cerrar}>
+          {cerrando ? 'Cerrando…' : 'Cerrar jornada'}
+        </button>
+      </div>
+
+      <ul className="flex flex-wrap gap-2">
+        {dentro.map(p => (
+          <li key={p.id} className="text-xs px-2 py-1 rounded-lg bg-surface-2 border border-border">
+            <span className="text-text-1">{p.nombre}</span>
+            {p.desde && <span className="text-text-3"> · desde {hora(p.desde)}</span>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }

@@ -16,6 +16,14 @@ export const acreditadosApi = {
   autorizar : (eventoId, puestoId)         => client.post(`/eventos/${eventoId}/acreditados/${puestoId}/autorizar`).then(r => r.data),
   revocar   : (eventoId, puestoId, motivo) => client.post(`/eventos/${eventoId}/acreditados/${puestoId}/revocar`, { motivo }).then(r => r.data),
 
+  /* Quién no ha salido. A las ocho de la noche, con el galpón lleno de
+     herramienta, es la pregunta útil — más que a quién se dejó entrar. */
+  dentro    : (eventoId)                   => client.get(`/eventos/${eventoId}/acreditados/dentro`).then(r => r.data),
+  /* Y cerrarla, porque la gente no escanea al salir: entrar abre una puerta y
+     salir no tiene premio. Sin esto la lista miente, y una lista que miente se
+     deja de mirar. */
+  cerrarJornada: (eventoId, nota)          => client.post(`/eventos/${eventoId}/acreditados/cerrar-jornada`, { nota }).then(r => r.data),
+
   /* Enlace público: quien tiene el código de la boleta pone los nombres. Sin
      sesión a propósito — la cuadrilla de un stand no tiene cuenta. */
   mios      : (codigo)                     => client.get(`/acreditar/${codigo}`).then(r => r.data),
