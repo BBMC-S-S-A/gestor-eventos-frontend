@@ -48,7 +48,7 @@ export default function AcreditarPage() {
     </div>
   );
 
-  const { boleta, puestos = [], requiere_autorizacion: requiereAut, vigencia } = data;
+  const { boleta, puestos = [], requiere_autorizacion: requiereAut, puedo_autorizar: puedoAut, vigencia } = data;
   const faltan = puestos.filter(p => !p.nombre).length;
 
   return (
@@ -78,9 +78,18 @@ export default function AcreditarPage() {
       {requiereAut && (
         <div className="rounded-2xl border border-warning/30 bg-warning/5 px-4 py-3">
           <p className="text-sm text-text-2">
-            Cada persona tiene que ser <b className="text-text-1">autorizada por la organización</b> antes
-            de poder entrar, y para eso hace falta su <b className="text-text-1">documento</b>. Escríbelo
-            exacto: en la puerta se compara con la cédula.
+            {puedoAut
+              /* Que sepa desde el principio que puede resolver un cambio de
+                 última hora sin llamar a nadie: si cree que no puede, a las
+                 seis de la mañana no lo intenta y manda al primo con el QR del
+                 que se enfermó. */
+              ? <>Tú respondes por esta gente. Para acreditar a alguien hace falta
+                  su <b className="text-text-1">documento</b>: escríbelo exacto, porque en la
+                  puerta se compara con la cédula. Si a última hora viene otra persona,
+                  puedes cambiarla tú mismo.</>
+              : <>Cada persona tiene que ser <b className="text-text-1">autorizada por la organización</b> antes
+                  de poder entrar, y para eso hace falta su <b className="text-text-1">documento</b>. Escríbelo
+                  exacto: en la puerta se compara con la cédula.</>}
           </p>
         </div>
       )}
@@ -93,19 +102,21 @@ export default function AcreditarPage() {
 
       <div className="space-y-3">
         {puestos.map(p => (
-          <Persona key={p.id} codigo={codigo} puesto={p} requiereAut={requiereAut} onGuardado={cargar} />
+          <Persona key={p.id} codigo={codigo} puesto={p} requiereAut={requiereAut}
+            puedoAut={puedoAut} onGuardado={cargar} />
         ))}
       </div>
     </div>
   );
 }
 
-function Persona({ codigo, puesto, requiereAut, onGuardado }) {
+function Persona({ codigo, puesto, requiereAut, puedoAut, onGuardado }) {
   const [form, setForm]     = useState({
     nombre: puesto.nombre || '', documento: puesto.documento || '',
     email: puesto.email || '', telefono: puesto.telefono || '',
   });
   const [guardando, setGuardando] = useState(false);
+  const [sustituyendo, setSustituyendo] = useState(false);
   const [err, setErr]       = useState(null);
 
   /* Quien ya entró no se puede cambiar: sería reescribir a quién se dejó pasar
@@ -147,13 +158,33 @@ function Persona({ codigo, puesto, requiereAut, onGuardado }) {
         ))}
       </div>
 
+      {!cerrado && <Foto codigo={codigo} puesto={puesto} onGuardado={onGuardado} />}
+
       {err && <p className="text-xs text-danger">{err}</p>}
 
       {!cerrado && (
-        <button className="btn btn-primary btn-sm" disabled={!form.nombre.trim() || !cambio || guardando}
-          onClick={guardar}>
-          {guardando ? 'Guardando…' : 'Guardar'}
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button className="btn btn-primary btn-sm" disabled={!form.nombre.trim() || !cambio || guardando}
+            onClick={guardar}>
+            {guardando ? 'Guardando…' : 'Guardar'}
+          </button>
+
+          {/* Viene otra persona. Es un botón aparte de «Guardar» a propósito:
+              corregir un nombre mal escrito y cambiar de persona parecen lo
+              mismo en un formulario y no lo son — lo segundo anula la
+              credencial del anterior, y eso no puede pasar por descuido al
+              arreglar una tilde. */}
+          {puesto.nombre && (
+            <button className="btn btn-ghost btn-sm" onClick={() => setSustituyendo(v => !v)}>
+              {sustituyendo ? 'Cancelar' : 'Viene otra persona'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {sustituyendo && (
+        <Sustituir codigo={codigo} puesto={puesto} puedoAut={puedoAut} requiereAut={requiereAut}
+          onHecho={() => { setSustituyendo(false); onGuardado(); }} />
       )}
 
       {/* Cambiar de persona después de estar aprobado vuelve a dejarla
@@ -162,6 +193,121 @@ function Persona({ codigo, puesto, requiereAut, onGuardado }) {
       {requiereAut && puesto.autorizado_at && cambio && (
         <p className="text-xs text-warning">
           Si cambias el nombre o el documento, esta persona vuelve a quedar pendiente de autorización.
+        </p>
+      )}
+    </div>
+  );
+}
+
+/* ─────────── La foto ─────────── */
+
+/* Va aparte del formulario y se guarda sola al elegirla.
+ *
+ * Es lo que se hace con el teléfono en la mano y la persona delante: se toma la
+ * foto y se sigue. Meterla dentro del «Guardar» de abajo obligaría a subir el
+ * archivo y ADEMÁS acordarse de pulsar, y lo que pasa entonces es que la foto
+ * se queda sin subir sin que nadie lo note. */
+function Foto({ codigo, puesto, onGuardado }) {
+  const [subiendo, setSubiendo] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const elegir = async (file) => {
+    if (!file) return;
+    setSubiendo(true); setErr(null);
+    try {
+      const ficha = await acreditadosApi.subirFoto(file);
+      /* Se guarda la RUTA, no una URL: la carpeta es privada y el enlace para
+         verla lo firma el servidor cada vez, con quince minutos de vida. */
+      await acreditadosApi.poner(codigo, puesto.id, { foto_url: ficha.ruta });
+      onGuardado();
+    } catch (e) {
+      setErr(e.response?.data?.error || e.message);
+    } finally { setSubiendo(false); }
+  };
+
+  return (
+    <div className="flex items-center gap-3">
+      {puesto.foto_url
+        ? <img src={puesto.foto_url} alt="" className="w-16 h-16 rounded-xl object-cover border border-border" />
+        : <div className="w-16 h-16 rounded-xl bg-surface-3 border border-border" />}
+      <div>
+        <label className="btn btn-secondary btn-sm cursor-pointer">
+          {subiendo ? 'Subiendo…' : puesto.foto_url ? 'Cambiar foto' : 'Añadir foto'}
+          {/* `capture` para que en el móvil abra la cámara directamente: la
+              foto se toma ahí mismo, no se busca en la galería. */}
+          <input type="file" accept="image/*" capture="user" className="hidden" disabled={subiendo}
+            onChange={e => elegir(e.target.files?.[0])} />
+        </label>
+        <p className="text-xs text-text-3 mt-1">
+          En la puerta se compara con la cara. Sólo la ve quien controla el acceso.
+        </p>
+        {err && <p className="text-xs text-danger mt-1">{err}</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── Viene otra persona ─────────── */
+
+/* «El que iba se enfermó. Vino el primo.»
+ *
+ * El caso que decide si toda la acreditación sirve o se rodea: sin una
+ * respuesta para él, a las seis de la mañana el primo entra con el QR del otro
+ * o el guardia lo deja pasar de palabra, y no queda registro de nadie.
+ *
+ * Se dice en voz alta lo que va a pasar con la credencial anterior, porque es
+ * irreversible y porque es justo lo que da tranquilidad: la del que no vino
+ * deja de abrir. */
+function Sustituir({ codigo, puesto, puedoAut, requiereAut, onHecho }) {
+  const [form, setForm] = useState({ nombre: '', documento: '', telefono: '' });
+  const [yendo, setYendo] = useState(false);
+  const [err, setErr] = useState(null);
+
+  const faltaDoc = requiereAut && puedoAut && !form.documento.trim();
+
+  const cambiar = async () => {
+    setYendo(true); setErr(null);
+    try { await acreditadosApi.sustituir(codigo, puesto.id, form); onHecho(); }
+    catch (e) { setErr(e.response?.data?.error || e.message); setYendo(false); }
+  };
+
+  return (
+    <div className="rounded-xl border border-warning/30 bg-warning/5 p-3 space-y-3">
+      <p className="text-sm text-text-2">
+        Va a entrar otra persona en lugar de <b className="text-text-1">{puesto.nombre}</b>.
+        {' '}Su credencial <b className="text-text-1">deja de abrir</b> en cuanto guardes esto.
+      </p>
+
+      <div className="grid sm:grid-cols-3 gap-3">
+        {[['nombre', 'Nombre completo'], ['documento', 'Documento'], ['telefono', 'Teléfono']].map(([k, label]) => (
+          <label key={k} className="text-xs text-text-3">
+            {label}
+            <input value={form[k]} onChange={e => setForm(f => ({ ...f, [k]: e.target.value }))}
+              className="input text-sm" />
+          </label>
+        ))}
+      </div>
+
+      {/* Lo que va a pasar DESPUÉS de guardar, dicho antes: si hay que esperar
+          a la organización, quien está en la puerta necesita saberlo ahora, no
+          cuando el primo esté delante del escáner. */}
+      {requiereAut && (
+        <p className="text-xs text-text-2">
+          {puedoAut
+            ? 'Queda acreditada de inmediato, bajo tu responsabilidad.'
+            : 'Queda registrada, pero no entra hasta que la organización la autorice.'}
+        </p>
+      )}
+
+      {err && <p className="text-xs text-danger">{err}</p>}
+
+      <button className="btn btn-primary btn-sm" disabled={!form.nombre.trim() || faltaDoc || yendo}
+        onClick={cambiar}>
+        {yendo ? 'Cambiando…' : 'Cambiar de persona'}
+      </button>
+      {faltaDoc && (
+        <p className="text-xs text-warning">
+          Hace falta el documento: es con lo que la puerta comprueba que es quien dice ser.
         </p>
       )}
     </div>

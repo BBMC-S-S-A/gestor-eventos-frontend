@@ -20,4 +20,23 @@ export const acreditadosApi = {
      sesión a propósito — la cuadrilla de un stand no tiene cuenta. */
   mios      : (codigo)                     => client.get(`/acreditar/${codigo}`).then(r => r.data),
   poner     : (codigo, puestoId, body)     => client.patch(`/acreditar/${codigo}/puestos/${puestoId}`, body).then(r => r.data),
+  /* «El que iba se enfermó, va el primo». Cambia de persona, no corrige un
+     nombre: la credencial del anterior deja de abrir en el acto. */
+  sustituir : (codigo, puestoId, body)     => client.post(`/acreditar/${codigo}/puestos/${puestoId}/sustituir`, body).then(r => r.data),
+
+  /* La foto de quien viene al montaje.
+   *
+   * El cuerpo ES el archivo y el nombre va en la query: así lo espera
+   * `/archivos` y así no hace falta `multipart`. Lo que se guarda en el puesto
+   * es la RUTA y no una URL: la carpeta es privada —es la cara de un
+   * trabajador junto a su documento— y el servidor firma un enlace de quince
+   * minutos cada vez que alguien con derecho la pide.
+   *
+   * Timeout aparte: una foto de móvil por la red del recinto no cabe en los
+   * quince segundos que valen para un JSON. */
+  subirFoto : (file) => client.put('/archivos/acreditacion', file, {
+    params : { nombre: file.name },
+    headers: { 'Content-Type': file.type || 'application/octet-stream' },
+    timeout: 120000,
+  }).then(r => r.data),
 };
