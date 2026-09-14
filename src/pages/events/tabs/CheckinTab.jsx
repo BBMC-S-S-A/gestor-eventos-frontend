@@ -1062,7 +1062,49 @@ function ResultadoCard({ result, compact }) {
               )}
             </div>
           )}
+
+          {/* Con qué comparar la cédula (0127). Sólo aparece cuando la
+              credencial va a nombre de una persona concreta: en una entrada
+              general el servidor manda la ficha vacía y aquí no se pinta nada.
+
+              Va también en el rechazo, y a propósito: quien está en la puerta
+              tiene que poder decirle a la persona qué credencial es la suya y a
+              quién preguntar, no sólo que no pasa. */}
+          <FichaDeLaPuerta ficha={result.ficha} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── Con qué comparar la cédula ─────────── */
+
+/* La comprobación de verdad en un montaje no la hace el software: la hace
+   quien está en la puerta mirando el documento y la cara. Si el escáner sólo
+   enseña un nombre, no hay nada que comparar y un QR reenviado por WhatsApp
+   abre igual.
+
+   En una boleta normal esto no pinta nada —la ficha viene vacía—, así que la
+   pantalla de siempre no cambia. */
+function FichaDeLaPuerta({ ficha }) {
+  if (!ficha || (!ficha.documento && !ficha.foto_url && !ficha.autorizado_por)) return null;
+  return (
+    <div className="mt-3 flex items-start gap-3 rounded-2xl border border-border bg-surface-2/60 p-3">
+      {ficha.foto_url && (
+        <img src={ficha.foto_url} alt=""
+          className="w-16 h-16 rounded-xl object-cover flex-shrink-0 border border-border" />
+      )}
+      <div className="min-w-0 text-sm">
+        {ficha.nombre && <p className="font-medium text-text-1 truncate">{ficha.nombre}</p>}
+        {/* Grande y en monoespaciada: es el número que se está leyendo de la
+            cédula, carácter a carácter, con la persona delante. */}
+        {ficha.documento && (
+          <p className="font-mono text-lg text-text-1 tracking-wide">{ficha.documento}</p>
+        )}
+        {ficha.telefono && <p className="text-xs text-text-3">{ficha.telefono}</p>}
+        {ficha.autorizado_por && (
+          <p className="text-xs text-text-3 mt-1">Autorizado por {ficha.autorizado_por}</p>
+        )}
       </div>
     </div>
   );

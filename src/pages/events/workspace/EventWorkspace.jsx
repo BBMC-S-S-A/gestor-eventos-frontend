@@ -46,6 +46,7 @@ import PlanoTab          from '../tabs/PlanoTab.jsx';
 import AnalyticsTab      from '../tabs/AnalyticsTab.jsx';
 import ClientesTab       from '../tabs/ClientesTab.jsx';
 import CheckinTab        from '../tabs/CheckinTab.jsx';
+import AcreditadosTab    from '../tabs/AcreditadosTab.jsx';
 import NetworkingTab     from '../tabs/NetworkingTab.jsx';
 import TorneoTab         from '../tabs/TorneoTab.jsx';
 import MapaSection       from './MapaSection.jsx';
@@ -238,6 +239,11 @@ const SECCIONES = [
        entregar el evento entero por diseñar una escarapela: se podía conceder,
        se veía marcado, y la pestaña no aparecía. */
     { id: 'acreditacion', label: 'Acreditación', perm: ['checkin', 'editar_evento', 'gestionar_acreditacion'] },
+    /* Quién entra con cada boleta y quién responde por él (0127). Aparte de
+       «Acreditación», que es diseñar e imprimir la escarapela: esto es decidir
+       a quién se le da. Las dos cosas se hacen en momentos distintos y a
+       menudo las hace gente distinta. */
+    { id: 'acreditados',  label: 'Quién entra',  perm: ['checkin', 'editar_evento', 'gestionar_acreditacion'] },
     /* Dos cosas dentro, con dueños distintos, y la pestaña se abre para
        cualquiera de las dos:
          · Invitaciones (el padrón) pide `gestionar_padron` o `editar_evento`
@@ -770,6 +776,7 @@ function Contenido({ seccion, tab, evento, soyOwner, reload, permisos, onAnuncio
     case 'asistentes/clientes'      : return <ClientesTab evento={evento}
                                         puedeBorrar={puedeVer('borrar_boletas', soyOwner, permisos)} />;
     case 'asistentes/checkin'       : return <CheckinTab evento={evento} miRolId={miRolId} miUserId={miUserId} permisos={permisos} soyOwner={soyOwner} />;
+    case 'asistentes/acreditados'   : return <AcreditadosTab evento={evento} />;
     /* Esta pantalla toca tres cosas con tres permisos distintos (la zona, la
        agenda y los stands), así que recibe la lista y decide ella: la regla de
        cada acción vive junto a la acción. */

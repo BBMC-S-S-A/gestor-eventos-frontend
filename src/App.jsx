@@ -25,6 +25,7 @@ const MapaPublicoPage    = lazy(() => import('./pages/public/MapaPublicoPage.jsx
 const AgendaPublicaPage  = lazy(() => import('./pages/public/AgendaPublicaPage.jsx'));
 const LegalEventoPage    = lazy(() => import('./pages/public/LegalEventoPage.jsx'));
 const MiTicketPage       = lazy(() => import('./pages/public/MiTicketPage.jsx'));
+const AcreditarPage      = lazy(() => import('./pages/public/AcreditarPage.jsx'));
 const VerificarBoletaPage = lazy(() => import('./pages/public/VerificarBoletaPage.jsx'));
 const AutorizarPage = lazy(() => import('./pages/conectar/AutorizarPage.jsx'));
 const EmbedPage          = lazy(() => import('./pages/public/EmbedPage.jsx'));
@@ -119,6 +120,10 @@ export default function App() {
                     pueden leer no es aceptar nada. */}
                 <Route path="/explorar/:slug/legal"  element={<LegalEventoPage />} />
                 <Route path="/mi-ticket/:codigo" element={<MiTicketPage />} />
+                {/* Quién entra con esta boleta: los nombres de una mesa, o la
+                    cuadrilla que monta un stand (0118/0127). Sin cuenta — esa
+                    gente no tiene usuario en la plataforma. */}
+                <Route path="/acreditar/:codigo" element={<AcreditarPage />} />
                 {/* «¿Esta boleta es real?», para quien la está COMPRANDO a otra
                     persona. Ruta aparte de /mi-ticket a propósito: aquélla
                     enseña el QR, y enseñárselo a quien no ha pagado sería
