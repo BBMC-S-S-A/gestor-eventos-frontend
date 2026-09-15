@@ -5,6 +5,17 @@ import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 import { ThemeProvider } from './context/ThemeContext.jsx';
 import { I18nProvider } from './context/I18nContext.jsx';
+import { intentarRecuperarDeAssetViejo } from './lib/assetsViejos.js';
+
+/* Cuando un `import()` dinámico falla al traer su chunk —el mismo síntoma de
+   fondo que documenta assetsViejos.js: un service worker viejo sirviendo
+   archivos que ya no coinciden con la build actual— Vite dispara este evento
+   en vez de dejar que el error rompa quién sabe qué a medio camino. Es el
+   único de los dos casos (el otro es el `ReferenceError` que cachea
+   ErrorBoundary) que nunca llega a React. */
+window.addEventListener('vite:preloadError', (evento) => {
+  if (intentarRecuperarDeAssetViejo(evento.payload)) evento.preventDefault();
+});
 
 /* El service worker de vite-plugin-pwa, con `registerType: 'autoUpdate'`.
  *
