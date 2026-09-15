@@ -54,6 +54,33 @@ export default function SessionForm({ initial, speakers, prefillDate, torneos = 
 
   const zonasEvento = useMemo(() => zonasDelEvento(evento), [evento]);
 
+  /* Declarado antes de `enganchePorNombre`: ese useMemo lee `form.zona_id` /
+     `form.ubicacion` / `form.track` en su arreglo de dependencias, y ese
+     arreglo se evalúa de inmediato al llamar a `useMemo` — no dentro del
+     callback, que sí es perezoso. Con el `useState` de `form` más abajo en
+     el código (como estaba antes), esa lectura caía en la zona muerta
+     temporal de `form` y tiraba el formulario entero con un
+     `ReferenceError: Cannot access 'form' before initialization`, en TODOS
+     los renders, no de forma intermitente. */
+  const [form, setForm] = useState({
+    titulo     : initial?.titulo || '',
+    descripcion: initial?.descripcion || '',
+    inicio     : initial?.inicio ? toLocalInput(initial.inicio) : (prefillDate ? toLocalInput(withDefaultTime(prefillDate, 9, 0)) : ''),
+    fin        : initial?.fin    ? toLocalInput(initial.fin)    : '',
+    track      : initial?.track || 'principal',
+    ubicacion  : initial?.ubicacion || '',
+    zona_id    : initial?.zona_id || '',
+    speaker_id : initial?.speaker_id || '',
+    expositor_id  : initial?.expositor_id || '',
+    ticket_type_id: initial?.ticket_type_id || '',
+    tipo       : initial?.tipo || TIPO_DEFECTO,
+    subcategoria: initial?.subcategoria || '',
+    torneo_id  : initial?.torneo_id || '',
+    requiere_inscripcion: Boolean(initial?.requiere_inscripcion),
+    cupo       : initial?.cupo ?? '',
+    formulario_modo: initial?.formulario_modo || 'ninguno',
+  });
+
   /* ¿Esta actividad se engancharía al mapa sólo por el nombre?
    *
    * Se repite aquí la comparación que hace `lib/aforoZonas.js` en el servidor
@@ -75,24 +102,6 @@ export default function SessionForm({ initial, speakers, prefillDate, torneos = 
   const tracksUsados = useMemo(() => sitiosDelEvento(evento, sessions, 'track'), [evento, sessions]);
   const ubicaciones  = useMemo(() => sitiosDelEvento(evento, sessions, 'ubicacion'), [evento, sessions]);
 
-  const [form, setForm] = useState({
-    titulo     : initial?.titulo || '',
-    descripcion: initial?.descripcion || '',
-    inicio     : initial?.inicio ? toLocalInput(initial.inicio) : (prefillDate ? toLocalInput(withDefaultTime(prefillDate, 9, 0)) : ''),
-    fin        : initial?.fin    ? toLocalInput(initial.fin)    : '',
-    track      : initial?.track || 'principal',
-    ubicacion  : initial?.ubicacion || '',
-    zona_id    : initial?.zona_id || '',
-    speaker_id : initial?.speaker_id || '',
-    expositor_id  : initial?.expositor_id || '',
-    ticket_type_id: initial?.ticket_type_id || '',
-    tipo       : initial?.tipo || TIPO_DEFECTO,
-    subcategoria: initial?.subcategoria || '',
-    torneo_id  : initial?.torneo_id || '',
-    requiere_inscripcion: Boolean(initial?.requiere_inscripcion),
-    cupo       : initial?.cupo ?? '',
-    formulario_modo: initial?.formulario_modo || 'ninguno',
-  });
   const [saving, setSaving] = useState(false);
   /* Las llaves creadas SIN salir de aquí. La lista que llega por props se
      recarga cuando el padre vuelve a pedir la agenda; hasta entonces el torneo
