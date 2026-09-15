@@ -1,5 +1,6 @@
 import { Component } from 'react';
 import { tEstatico as t } from '../../context/I18nContext.jsx';
+import { intentarRecuperarDeAssetViejo } from '../../lib/assetsViejos.js';
 
 /* Red de seguridad: si un componente hijo lanza un error en render, en vez de
    dejar TODA la app en blanco, mostramos un mensaje y el resto sigue usable.
@@ -19,6 +20,13 @@ export default class ErrorBoundary extends Component {
   componentDidCatch(error, info) {
     /* Log para diagnóstico (y para Sentry si algún día se conecta). */
     console.error('[ErrorBoundary]', error, info?.componentStack);
+
+    /* Si esto tiene pinta de ser un chunk viejo servido por un service
+       worker desincronizado (ver src/lib/assetsViejos.js), se limpia y se
+       recarga sola — quien estaba mirando esta pantalla no llega a ver el
+       mensaje de error. Si ya se intentó hace poco y volvió a pasar, no es
+       esto: se sigue de largo y se muestra la pantalla de abajo. */
+    intentarRecuperarDeAssetViejo(error);
   }
 
   reset = () => this.setState({ error: null });
