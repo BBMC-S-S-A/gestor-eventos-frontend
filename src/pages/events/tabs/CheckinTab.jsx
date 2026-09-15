@@ -3,11 +3,12 @@ import QrScanner from '../../../components/ui/QrScanner.jsx';
 import { clientesApi } from '../../../api/clientes.js';
 import { agendaApi } from '../../../api/agenda.js';
 import { interaccionesApi } from '../../../api/interacciones.js';
+import { derechosApi } from '../../../api/derechos.js';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { useAsistenciaEnVivo } from '../../../hooks/useAsistenciaEnVivo.js';
 import AsistenciaContador from '../../../components/ui/AsistenciaContador.jsx';
 import { zonasDelEvento, etiquetaZona } from '../../../lib/zonas.js';
-import { encolar, leerCola, quitar, cantidadCola, TIPO_INGRESO, TIPO_SESION } from '../../../lib/checkinOffline.js';
+import { encolar, leerCola, quitar, cantidadCola, TIPO_INGRESO, TIPO_SESION, TIPO_ENTREGA } from '../../../lib/checkinOffline.js';
 import { leerQr } from '../../../lib/qrEscaneado.js';
 
 /* Tab Escanear — el ÚNICO sitio donde se pasa una escarapela por un móvil.
@@ -25,6 +26,13 @@ import { leerQr } from '../../../lib/qrEscaneado.js';
                   "asistentes al taller" en "gente que estaba en el edificio".
    · Puntos     → se le marca un motivo en un stand y suma (o resta) puntos.
    · Canjear    → cambia sus puntos por un premio.
+   · Entregar   → se le da lo que su boleta INCLUYE: el refrigerio, el almuerzo,
+                  el kit, el parqueadero. No cuesta puntos y no es un premio:
+                  ya era suyo, y lo que se registra es que se lo dieron y quién
+                  se lo dio. Vive aquí por la misma razón que los dos de
+                  arriba: la acción física es una —pasar una escarapela por un
+                  móvil— y mandar a otra pantalla con la misma persona delante
+                  es trabajo de más.
 
    Los dos últimos vivían en «Stands y puntos», que era otra pantalla con otro
    escáner. La acción física es UNA —pasar una escarapela por un móvil— y lo
@@ -36,9 +44,22 @@ import { leerQr } from '../../../lib/qrEscaneado.js';
    Quien no esté inscrito no se marca a la fuerza: se registra primero y se
    vuelve a escanear. */
 
-export default function CheckinTab({ evento, miRolId = null, miUserId = null }) {
+export default function CheckinTab({ evento, miRolId = null, miUserId = null, permisos = [], soyOwner = false }) {
+  /* Los dos trabajos de esta pantalla tienen dueños distintos.
+   *
+   * Quien reparte el almuerzo puede no poder abrir la puerta —`entregar` sin
+   * `checkin`, que es justo para lo que se separaron— y quien está en la
+   * puerta puede no repartir nada. Con la pestaña abierta por cualquiera de
+   * los dos permisos, hay que decidir DENTRO qué modos enseñar: si no, quien
+   * sólo entrega abre la pantalla en «Check-in» y el primer escaneo le marca
+   * la entrada a alguien en vez de darle su comida. */
+  const mandaTodo  = soyOwner || permisos.includes('*');
+  const puedeEntrar   = mandaTodo || permisos.includes('checkin');
+  const puedeEntregar = mandaTodo || permisos.includes('entregar');
+
   const [mode, setMode]       = useState('manual'); // manual | camara
-  const [accion, setAccion]   = useState('checkin'); // checkin | reingreso | subevento | puntos | canjear
+  /* Se abre en lo único que esta persona puede hacer. */
+  const [accion, setAccion]   = useState(puedeEntrar ? 'checkin' : 'entregar'); // checkin | reingreso | subevento | puntos | canjear | entregar
   const [working, setWorking] = useState(false);
   const [last, setLast]       = useState(null); // { ok, ticket, error, sound }
   const [historial, setHistorial] = useState([]); // últimos check-ins de esta sesión
@@ -212,6 +233,17 @@ export default function CheckinTab({ evento, miRolId = null, miUserId = null }) 
            desplegara una versión nueva a mitad del evento. */
         if ((tipo || TIPO_INGRESO) === TIPO_SESION) {
           await agendaApi.marcarAsistencia(evento.id, sesionId, payload);  // payload lleva `at`
+        } else if ((tipo || TIPO_INGRESO) === TIPO_ENTREGA) {
+          /* `origen: 'cola'` para que una auditoría pueda separar lo que se
+             entregó con red de lo que llegó horas después. Y el `at` que va
+             dentro es la hora REAL: sin él, los cuatrocientos almuerzos de una
+             tableta sin señal aparecerían todos en el minuto en que volvió el
+             wifi.
+
+             El duplicado que pueda traer la cola no hace falta esquivarlo
+             aquí: lo para el índice único de la base y vuelve como 409, que es
+             de los definitivos y se descarta abajo. */
+          await derechosApi.entregar(evento.id, { ...payload, origen: 'cola' });
         } else {
           await clientesApi.checkin(evento.id, payload);  // payload incluye `at` (hora real) y acceso_id
         }
@@ -408,6 +440,105 @@ export default function CheckinTab({ evento, miRolId = null, miUserId = null }) 
     }
   }, [evento.id, working]);
 
+  /* ── Entregar lo que la boleta incluye (0126) ─────────────────────────
+   *
+   * El derecho y la franja se eligen ANTES de escanear y se quedan fijos, como
+   * el motivo de los puntos: en la fila del almuerzo se entrega lo mismo
+   * cuatrocientas veces seguidas, y preguntarlo por persona sería un toque de
+   * más multiplicado por cuatrocientos. */
+  const [derechos, setDerechos]   = useState([]);
+  const [derechoId, setDerechoId] = useState('');
+  const [ventanaId, setVentanaId] = useState('');
+  const [recuento, setRecuento]   = useState(null);
+
+  const derecho = useMemo(() => derechos.find(d => d.id === derechoId) || null, [derechos, derechoId]);
+
+  useEffect(() => {
+    if (!puedeEntregar) return;
+    let vivo = true;
+    derechosApi.list(evento.id)
+      .then(d => { if (vivo) setDerechos((d.derechos || []).filter(x => x.activo)); })
+      /* En silencio: quien viene a hacer check-in no tiene por qué ver un
+         error de una pestaña que no va a abrir. Si de verdad hay derechos y no
+         cargaron, el selector sale vacío y lo dice. */
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [evento.id, puedeEntregar]);
+
+  /* La franja que está abierta AHORA, elegida sola. Es lo que quiere quien
+     entrega: llega a las 12:05, abre la pantalla y ya está en «Almuerzo día
+     1». Se puede cambiar a mano —hay quien reparte a destiempo y hay que poder
+     anotarlo donde toca—, y por eso sólo se rellena cuando está vacía. */
+  useEffect(() => {
+    if (!derecho || ventanaId) return;
+    const ahora = Date.now();
+    const abierta = (derecho.ventanas || []).find(v => {
+      const i = v.inicio ? new Date(v.inicio).getTime() : -Infinity;
+      const f = v.fin ? new Date(v.fin).getTime() : Infinity;
+      return ahora >= i && ahora <= f;
+    });
+    if (abierta) setVentanaId(abierta.id);
+  }, [derecho, ventanaId]);
+
+  /* Cuántos van y cuántos faltan: es lo que la cocina pregunta cada media
+     hora. Se refresca al entregar y no en un intervalo — un contador que se
+     mueve solo en una pantalla que nadie mira gasta batería y datos en el
+     peor sitio del recinto para las dos cosas. */
+  const refrescarRecuento = useCallback(async (dId, vId) => {
+    if (!dId) return;
+    try {
+      setRecuento(await derechosApi.recuento(evento.id, dId, vId ? { ventana_id: vId } : {}));
+    } catch { setRecuento(null); }
+  }, [evento.id]);
+
+  useEffect(() => { refrescarRecuento(derechoId, ventanaId); }, [derechoId, ventanaId, refrescarRecuento]);
+
+  /* Lo elegido, a mano para el handler: `despachar` se vuelve a crear con cada
+     cambio y el escaneo tiene que llevar SIEMPRE lo que hay en pantalla ahora,
+     no lo que había cuando se montó la cámara. */
+  const entregaRef = useRef({ derechoId: '', ventanaId: '' });
+  useEffect(() => { entregaRef.current = { derechoId, ventanaId }; }, [derechoId, ventanaId]);
+
+  const handleEntrega = useCallback(async (payload) => {
+    if (working) return;
+    const { derechoId: dId, ventanaId: vId } = entregaRef.current;
+    if (!dId) { setLast({ entregaMode: true, ok: false, error: 'Elige primero qué vas a entregar.' }); return; }
+    const queEs = derechos.find(x => x.id === dId);
+
+    /* Sin conexión, a la cola. El salón de comidas suele ser el peor punto de
+       wifi del recinto: si esto exigiera red, la salida del staff sería
+       apuntar en papel y no pasarlo nunca. */
+    if (!navigator.onLine) {
+      const { guardado, cantidad, yaEstaba } = encolar(
+        evento.id, { ...payload, derecho_id: dId, ventana_id: vId || null }, TIPO_ENTREGA);
+      setCola(cantidad);
+      setLast(guardado
+        ? { entregaMode: true, ok: true, offlineGuardado: true, yaEstaba, titulo: queEs?.nombre }
+        : { entregaMode: true, ok: false, noSeGuardo: true, error: 'No se pudo guardar el escaneo.' });
+      setTimeout(() => setWorking(false), 600);
+      return;
+    }
+
+    setWorking(true);
+    setLast(null);
+    try {
+      const r = await derechosApi.entregar(evento.id, {
+        ...payload, derecho_id: dId, ventana_id: vId || null,
+      });
+      setLast({ entregaMode: true, ...r });
+      setHistorial(h => [{
+        guest_nombre: r.persona, codigo: r.boleta?.codigo,
+        at: new Date(), ok: true, entrega: r.titulo,
+      }, ...h].slice(0, 10));
+      refrescarRecuento(dId, vId);
+    } catch (e) {
+      const d = e.response?.data || {};
+      setLast({ entregaMode: true, ok: false, ...d, error: d.error || e.message, titulo: queEs?.nombre });
+    } finally {
+      setTimeout(() => setWorking(false), 600);
+    }
+  }, [evento.id, working, derechos, refrescarRecuento]);
+
   /* Dar puntos: el motivo lo elige el operador ANTES de escanear y se queda
      fijo, porque en un stand se marca lo mismo cien veces seguidas. */
   const handlePuntos = useCallback(async (payload) => {
@@ -493,9 +624,10 @@ export default function CheckinTab({ evento, miRolId = null, miUserId = null }) 
       if (accion === 'reingreso') return await handleReingreso(leido);
       if (accion === 'puntos')    return await handlePuntos(leido);
       if (accion === 'canjear')   return await handleSaldo(leido);
+      if (accion === 'entregar')  return await handleEntrega(leido);
       return await handleCheckin(leido);
     } finally { ocupado.current = false; }
-  }, [accion, handleCheckin, handleReingreso, handleSubevento, handlePuntos, handleSaldo]);
+  }, [accion, handleCheckin, handleReingreso, handleSubevento, handlePuntos, handleSaldo, handleEntrega]);
   const onScanQr = useCallback((qr) => despachar(leerQr(qr)), [despachar]);
   const onSubmitCodigo = (codigo) => despachar({ codigo });
 
@@ -534,8 +666,17 @@ export default function CheckinTab({ evento, miRolId = null, miUserId = null }) 
               necesita: da sus puntos por su propio enlace, donde se le
               identifica. Lo de aquí son los puntos DEL EVENTO. */}
           {[
-            ['Ingreso', [['checkin', 'Check-in'], ['reingreso', 'Reingreso'], ['subevento', 'Sub-evento']]],
-            ['Puntos del evento', [['puntos', 'Puntos'], ['canjear', 'Canjear']]],
+            ...(puedeEntrar ? [
+              ['Ingreso', [['checkin', 'Check-in'], ['reingreso', 'Reingreso'], ['subevento', 'Sub-evento']]],
+              ['Puntos del evento', [['puntos', 'Puntos'], ['canjear', 'Canjear']]],
+            ] : []),
+            /* El tercer grupo aparece sólo si hay algo que entregar. Un botón
+               «Entregar» en un evento sin derechos configurados manda a una
+               pantalla que sólo sabe decir «elige primero qué vas a entregar»,
+               y no hay nada que elegir. */
+            ...(puedeEntregar && derechos.length
+              ? [['Lo que incluye', [['entregar', 'Entregar']]]]
+              : []),
           ].map(([grupo, opciones]) => (
             <div key={grupo} className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-widest text-text-3 font-semibold px-1">{grupo}</span>
@@ -671,6 +812,48 @@ export default function CheckinTab({ evento, miRolId = null, miUserId = null }) 
           <p className="text-xs text-text-2">
             Modo <b className="text-text-1">canjear</b>: al escanear se ve el saldo y qué le alcanza; el premio se elige después.
             Primero leer y luego elegir, porque el premio no se puede escoger antes de saber si puede pagarlo.
+          </p>
+        </div>
+      )}
+
+      {/* Entregar: qué y de qué franja, elegidos una vez y fijos para toda la
+          fila. Y el contador al lado, que es lo que se pregunta cada media
+          hora sin tener que salir de aquí. */}
+      {accion === 'entregar' && (
+        <div className="rounded-2xl border border-success/30 bg-success/5 px-4 py-3 space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs text-text-3">Entregando:</span>
+            <select value={derechoId}
+              onChange={e => { setDerechoId(e.target.value); setVentanaId(''); setLast(null); }}
+              className="input !h-8 !py-1 text-sm w-auto">
+              <option value="">Elige qué</option>
+              {derechos.map(d => <option key={d.id} value={d.id}>{d.nombre}</option>)}
+            </select>
+
+            {derecho?.cadencia === 'ventana' && (
+              <select value={ventanaId} onChange={e => { setVentanaId(e.target.value); setLast(null); }}
+                className="input !h-8 !py-1 text-sm w-auto">
+                <option value="">Elige la franja</option>
+                {(derecho.ventanas || []).map(v => <option key={v.id} value={v.id}>{v.nombre}</option>)}
+              </select>
+            )}
+
+            {recuento && (
+              <span className="text-xs text-text-2 ml-auto">
+                <b className="text-text-1">{recuento.entregados}</b> entregados
+                {recuento.con_derecho > 0 && <> · faltan {recuento.faltan} de {recuento.con_derecho}</>}
+                {recuento.cupo != null && <span className={recuento.sobre_cupo ? 'text-warning' : 'text-text-3'}> · cupo {recuento.cupo}</span>}
+              </span>
+            )}
+          </div>
+
+          <p className="text-xs text-text-2">
+            {derecho
+              ? <>Se registra <b className="text-text-1">a quién</b> se le entregó y <b className="text-text-1">quién</b> se lo entregó.
+                  {derecho.titular === 'grupo'
+                    ? ' Este va por boleta: lo puede recoger cualquiera del grupo.'
+                    : ' Este va por persona: cada acreditado tiene el suyo.'}</>
+              : 'Elige qué vas a entregar antes de escanear.'}
           </p>
         </div>
       )}
@@ -879,7 +1062,49 @@ function ResultadoCard({ result, compact }) {
               )}
             </div>
           )}
+
+          {/* Con qué comparar la cédula (0127). Sólo aparece cuando la
+              credencial va a nombre de una persona concreta: en una entrada
+              general el servidor manda la ficha vacía y aquí no se pinta nada.
+
+              Va también en el rechazo, y a propósito: quien está en la puerta
+              tiene que poder decirle a la persona qué credencial es la suya y a
+              quién preguntar, no sólo que no pasa. */}
+          <FichaDeLaPuerta ficha={result.ficha} />
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─────────── Con qué comparar la cédula ─────────── */
+
+/* La comprobación de verdad en un montaje no la hace el software: la hace
+   quien está en la puerta mirando el documento y la cara. Si el escáner sólo
+   enseña un nombre, no hay nada que comparar y un QR reenviado por WhatsApp
+   abre igual.
+
+   En una boleta normal esto no pinta nada —la ficha viene vacía—, así que la
+   pantalla de siempre no cambia. */
+function FichaDeLaPuerta({ ficha }) {
+  if (!ficha || (!ficha.documento && !ficha.foto_url && !ficha.autorizado_por)) return null;
+  return (
+    <div className="mt-3 flex items-start gap-3 rounded-2xl border border-border bg-surface-2/60 p-3">
+      {ficha.foto_url && (
+        <img src={ficha.foto_url} alt=""
+          className="w-16 h-16 rounded-xl object-cover flex-shrink-0 border border-border" />
+      )}
+      <div className="min-w-0 text-sm">
+        {ficha.nombre && <p className="font-medium text-text-1 truncate">{ficha.nombre}</p>}
+        {/* Grande y en monoespaciada: es el número que se está leyendo de la
+            cédula, carácter a carácter, con la persona delante. */}
+        {ficha.documento && (
+          <p className="font-mono text-lg text-text-1 tracking-wide">{ficha.documento}</p>
+        )}
+        {ficha.telefono && <p className="text-xs text-text-3">{ficha.telefono}</p>}
+        {ficha.autorizado_por && (
+          <p className="text-xs text-text-3 mt-1">Autorizado por {ficha.autorizado_por}</p>
+        )}
       </div>
     </div>
   );
@@ -893,7 +1118,72 @@ function TarjetaResultado({ result, compact, onCanjear }) {
   if (result.reingresoMode) return <ReingresoCard result={result} compact={compact} />;
   if (result.puntosMode)    return <PuntosCard result={result} compact={compact} />;
   if (result.canjearMode)   return <CanjearCard result={result} compact={compact} onCanjear={onCanjear} />;
+  if (result.entregaMode)   return <EntregaCard result={result} compact={compact} />;
   return <ResultadoCard result={result} compact={compact} />;
+}
+
+/* ─────────── Resultado de entregar lo que la boleta incluye ─────────── */
+
+/* Con cien personas en la fila esto es un sí o un no, y el detalle va debajo.
+ *
+ * El caso que más se ve después del verde es «ya lo recibió», y ahí la hora y
+ * el nombre de quien lo entregó no son adorno: son lo que resuelve la
+ * conversación con la persona delante, en vez de dejar al operador diciendo
+ * «pues aquí me sale que ya». */
+function EntregaCard({ result, compact }) {
+  const { ok, error, titulo, persona, ventana, avisos = [], ya_entregado, entregado_por, entregado_at, offlineGuardado, yaEstaba } = result;
+  const hora = entregado_at
+    ? new Date(entregado_at).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })
+    : null;
+  const cls = ok ? 'border-success/40 bg-success/10'
+    : ya_entregado ? 'border-warning/40 bg-warning/10' : 'border-danger/40 bg-danger/10';
+
+  return (
+    <div className={`rounded-3xl border-2 ${cls} ${compact ? 'backdrop-blur-xl bg-surface/90 p-5' : 'p-6'} animate-[fadeUp_0.3s_cubic-bezier(0.16,1,0.3,1)_both]`}>
+      <div className="flex items-center gap-4">
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-2xl font-bold flex-shrink-0 text-white ${ok ? 'bg-success' : ya_entregado ? 'bg-warning' : 'bg-danger'}`}>
+          {ok ? '✓' : ya_entregado ? '!' : '✕'}
+        </div>
+        <div className="min-w-0">
+          {ok ? (
+            <>
+              <h3 className="text-xl font-bold font-display text-text-1 truncate">
+                {offlineGuardado ? (titulo || 'Guardado') : titulo}
+              </h3>
+              <p className="text-sm text-text-2 truncate">
+                {offlineGuardado
+                  ? (yaEstaba ? 'Ya estaba guardado, se manda al volver la red.' : 'Sin conexión: se manda al volver la red.')
+                  : <>{persona}{ventana && <span className="text-text-3"> · {ventana}</span>}</>}
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="text-xl font-bold font-display text-text-1">
+                {ya_entregado ? 'Ya lo recibió' : 'No se pudo entregar'}
+              </h3>
+              <p className="text-sm text-text-2">{error}</p>
+              {/* Quién y cuándo: sin esto, «ya lo recibió» es una discusión. */}
+              {ya_entregado && (entregado_por || hora) && (
+                <p className="text-xs text-text-3 mt-0.5">
+                  {hora && <>a las {hora}</>}{entregado_por && <> · se lo entregó {entregado_por}</>}
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+
+      {/* Fuera de franja y por encima del cupo se entrega igual: son avisos, y
+          por eso van debajo del verde y no en lugar de él. */}
+      {avisos.length > 0 && (
+        <ul className="mt-3 space-y-1">
+          {avisos.map((a, i) => (
+            <li key={i} className="text-xs text-warning">· {a}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 /* ─────────── Resultado de dar puntos ─────────── */

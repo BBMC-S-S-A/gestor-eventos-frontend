@@ -261,6 +261,14 @@ function TicketForm({ initial, eventoId, currency, onSubmit, onCancel }) {
        que es lo que la lista hacía con todas hasta ahora. */
     rol              : rolValido(initial?.rol),
     instrucciones    : initial?.instrucciones || '',
+    /* 0127/0128 · La credencial. Todo esto nace apagado, así que un tipo de
+       boleta que nadie toque se comporta exactamente como antes: no caduca, no
+       pide autorización y sale a la venta. */
+    vigencia_desde       : toLocalInput(initial?.vigencia_desde),
+    vigencia_hasta       : toLocalInput(initial?.vigencia_hasta),
+    requiere_autorizacion: Boolean(initial?.requiere_autorizacion),
+    autoriza             : initial?.autoriza || 'evento',
+    visible_publico      : initial?.visible_publico !== false,
   });
   const [torneos, setTorneos] = useState([]);
   const [falloTorneos, setFalloTorneos] = useState(false);
@@ -284,7 +292,12 @@ function TicketForm({ initial, eventoId, currency, onSubmit, onCancel }) {
   const [metiendo, setMetiendo] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(
-    Boolean(initial?.early_bird_precio || initial?.early_bird_hasta || initial?.venta_hasta)
+    Boolean(initial?.early_bird_precio || initial?.early_bird_hasta || initial?.venta_hasta
+      /* Si esta boleta ya es una credencial configurada, el bloque se abre: un
+         ajuste que decide quién entra no puede quedar escondido detrás de
+         «Avanzado» cuando ya está puesto. */
+      || initial?.vigencia_desde || initial?.vigencia_hasta
+      || initial?.requiere_autorizacion || initial?.visible_publico === false)
   );
 
   const update = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -369,6 +382,14 @@ function TicketForm({ initial, eventoId, currency, onSubmit, onCancel }) {
          backend guarda al menos lo que ya sabía guardar y un stand sigue
          siendo un stand. */
       es_expositor     : form.crea === 'stand',
+      /* 0127/0128 · La credencial. Se manda siempre: un servidor sin las
+         migraciones descarta las claves que no conoce, y mandarlas sólo «si
+         cambiaron» dejaría un tipo a medio configurar sin que se notara. */
+      vigencia_desde       : form.vigencia_desde ? new Date(form.vigencia_desde).toISOString() : null,
+      vigencia_hasta       : form.vigencia_hasta ? new Date(form.vigencia_hasta).toISOString() : null,
+      requiere_autorizacion: form.requiere_autorizacion,
+      autoriza             : form.autoriza,
+      visible_publico      : form.visible_publico,
     };
     await onSubmit(payload);
     setSaving(false);
@@ -620,6 +641,83 @@ function TicketForm({ initial, eventoId, currency, onSubmit, onCancel }) {
               className="input-form bg-surface-2"
             />
             <p className="text-[11px] text-text-3 mt-1.5">Después de esta fecha no se podrán comprar más boletas de este tipo.</p>
+          </div>
+
+          {/* ── La credencial (0127/0128) ──────────────────────────────────
+              Hasta cuándo ABRE, que no es lo mismo que hasta cuándo se VENDE:
+              una boleta se vende en septiembre para diciembre, y una credencial
+              de montaje se emite en septiembre y sólo abre dos días de
+              noviembre. Estaban mezclados en el mismo campo y no lo son. */}
+          <div className="pt-4 mt-2 border-t border-border space-y-4">
+            <div>
+              <p className="text-sm font-medium text-text-1">La credencial</p>
+              <p className="text-[11px] text-text-3 mt-0.5">
+                Para credenciales de montaje, prensa o proveedores. Una boleta normal no necesita nada de esto.
+              </p>
+            </div>
+
+            <div className="grid sm:grid-cols-2 gap-3">
+              <div className="field">
+                <label className="label">Abre desde</label>
+                <input type="datetime-local" value={form.vigencia_desde}
+                  onChange={e => update('vigencia_desde', e.target.value)}
+                  className="input-form bg-surface-2" />
+              </div>
+              <div className="field">
+                <label className="label">Deja de abrir</label>
+                <input type="datetime-local" value={form.vigencia_hasta}
+                  onChange={e => update('vigencia_hasta', e.target.value)}
+                  className="input-form bg-surface-2" />
+              </div>
+            </div>
+            <p className="text-[11px] text-text-3 -mt-2">
+              Fuera de esas horas el QR no abre, aunque sea legítimo. Vacío = sin límite.
+            </p>
+
+            <label className="flex items-start gap-2 text-sm text-text-2 cursor-pointer">
+              <input type="checkbox" checked={form.requiere_autorizacion}
+                onChange={e => update('requiere_autorizacion', e.target.checked)} className="mt-1" />
+              <span>
+                <b className="text-text-1">Cada persona tiene que ser autorizada</b>
+                <br />
+                <span className="text-[11px] text-text-3">
+                  Se inscriben con nombre y documento desde el enlace de la boleta, y no reciben
+                  credencial hasta que alguien responde por ellas. Es lo que impide que quien quiere
+                  colarse se registre solo.
+                </span>
+              </span>
+            </label>
+
+            {form.requiere_autorizacion && (
+              <div className="field pl-6">
+                <label className="label">¿Quién autoriza?</label>
+                <select value={form.autoriza} onChange={e => update('autoriza', e.target.value)}
+                  className="input-form bg-surface-2">
+                  <option value="evento">Sólo la organización</option>
+                  <option value="responsable">También quien tiene el código de la boleta</option>
+                </select>
+                {/* El caso de las seis de la mañana: si sólo autoriza la
+                    organización, un cambio de última hora no tiene salida y el
+                    guardia acaba dejando pasar de palabra. */}
+                <p className="text-[11px] text-text-3 mt-1.5">
+                  {form.autoriza === 'responsable'
+                    ? 'El stand puede acreditar a un sustituto él mismo, y queda registrado que respondió por él. Es lo que resuelve «el que iba se enfermó» a las seis de la mañana.'
+                    : 'Un cambio de última hora tendrá que esperar a alguien de la organización.'}
+                </p>
+              </div>
+            )}
+
+            <label className="flex items-start gap-2 text-sm text-text-2 cursor-pointer">
+              <input type="checkbox" checked={!form.visible_publico}
+                onChange={e => update('visible_publico', !e.target.checked)} className="mt-1" />
+              <span>
+                <b className="text-text-1">No mostrar en la página pública</b>
+                <br />
+                <span className="text-[11px] text-text-3">
+                  Se sigue pudiendo emitir desde el panel, pero no sale a la venta.
+                </span>
+              </span>
+            </label>
           </div>
         </div>
       )}

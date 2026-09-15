@@ -92,6 +92,10 @@ export const PERMISOS = [
   { id: 'ver_clientes',          grupo: 'Clientes',  label: 'Ver lista de clientes',   desc: 'Acceso a la lista de inscritos.', aplicado: true },
   { id: 'gestionar_clientes',    grupo: 'Clientes',  label: 'Editar clientes',         desc: 'Cambiar el estado de una boleta, invalidarla, importar y exportar.', aplicado: true },
   { id: 'checkin',               grupo: 'Clientes',  label: 'Hacer check-in',          desc: 'Escanear QR y marcar asistencia.', aplicado: true },
+  /* Repartir lo que la boleta incluye: el almuerzo, el kit, el parqueadero
+     (0126). Aparte de `checkin` porque quien sirve la comida no tiene por que
+     poder abrir la puerta, y al reves. */
+  { id: 'entregar',              grupo: 'Clientes',  label: 'Entregar lo que incluye la boleta', desc: 'Escanear para dar refrigerios, almuerzos, kits o cualquier cosa incluida, dejando constancia de quien la entrego.', aplicado: true },
   /* Faltaba, y no en el sentido inofensivo: el servidor lo comprueba desde la
      0122 y aqui no estaba, asi que la casilla no existia y quien organiza NO
      podia concederselo a nadie. El permiso, el boton y la ruta estaban los

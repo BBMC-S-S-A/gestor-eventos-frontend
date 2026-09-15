@@ -25,14 +25,16 @@ import path from 'node:path';
 
 const leer = (f) => fs.readFileSync(path.join(process.cwd(), 'src', f), 'utf8').replace(/\r/g, '');
 
-/* Los 31 de `core/permisos/catalogo.js` al 2026-09-11. */
+/* Los 32 de `core/permisos/catalogo.js` al 2026-09-13. `entregar` es el
+   último: lo creó la 0126 para repartir lo que la boleta incluye —el almuerzo,
+   el kit, el parqueadero— sin tener que dar el permiso de la puerta. */
 const DEL_SERVIDOR = [
   'editar_evento', 'publicar_evento', 'editar_pagina_publica', 'gestionar_imagenes',
   'gestionar_agenda', 'gestionar_torneo', 'gestionar_expositores', 'gestionar_accesos',
   'invitar_staff', 'gestionar_roles', 'remover_miembros', 'gestionar_solicitudes',
   'gestionar_tareas', 'ver_documentos', 'gestionar_documentos', 'gestionar_vacantes',
   'gestionar_tickets', 'gestionar_descuentos',
-  'ver_clientes', 'gestionar_clientes', 'checkin', 'vip_zone', 'borrar_boletas',
+  'ver_clientes', 'gestionar_clientes', 'checkin', 'entregar', 'vip_zone', 'borrar_boletas',
   'gestionar_acreditacion', 'gestionar_padron',
   'crear_canales', 'borrar_mensajes', 'publicar_anuncios',
   'ver_pagos', 'reembolsar', 'ver_analytics',

@@ -36,6 +36,10 @@
 
 export const TIPO_INGRESO = 'ingreso';
 export const TIPO_SESION  = 'sesion';
+/* Entregar lo que la boleta incluye (0126). Entra en la cola por la misma
+   razón que el ingreso, y con más motivo: el salón de comidas suele ser el
+   peor punto de wifi de todo el recinto. */
+export const TIPO_ENTREGA = 'entrega';
 
 const KEY = (eventoId) => `gestek-offline-checkin:${eventoId}`;
 
@@ -62,7 +66,14 @@ function guardar(eventoId, cola) {
    persona —el QR firmado o el código escrito— más para qué se escaneó: la
    misma pulsera en dos charlas distintas son dos apuntes legítimos. */
 function huella(x) {
-  return [x.tipo, x.qr_token || '', (x.codigo || '').toUpperCase(), x.sesion_id || ''].join('|');
+  /* El derecho y la franja entran en la huella por lo mismo que el sub-evento:
+     la misma persona recogiendo el almuerzo y luego el refrigerio son dos
+     entregas legítimas, y el almuerzo del día 1 y el del día 2, también. Sin
+     ellos, la cola se comería la segunda creyendo que es un duplicado. */
+  return [
+    x.tipo, x.qr_token || '', (x.codigo || '').toUpperCase(), x.sesion_id || '',
+    x.derecho_id || '', x.ventana_id || '',
+  ].join('|');
 }
 
 export function encolar(eventoId, payload, tipo = TIPO_INGRESO) {
