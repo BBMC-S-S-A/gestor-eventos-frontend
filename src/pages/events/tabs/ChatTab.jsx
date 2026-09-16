@@ -2,7 +2,7 @@ import { useEffect, useState, useRef, useCallback } from 'react';
 import { chatApi } from '../../../api/chat.js';
 import { rolesApi } from '../../../api/roles.js';
 import { equipoApi } from '../../../api/equipo.js';
-import { supabase } from '../../../lib/supabase.js';
+import { useSondeo } from '../../../hooks/useSondeo.js';
 import { useAuth } from '../../../context/AuthContext.jsx';
 import { useToast } from '../../../context/ToastContext.jsx';
 import Spinner from '../../../components/ui/Spinner.jsx';
@@ -10,7 +10,7 @@ import GLoader from '../../../components/ui/GLoader.jsx';
 import { confirmDialog } from '../../../components/ui/Confirm.jsx';
 import { uploadEventImage } from '../../../components/ui/CoverUploader.jsx';
 
-/* Chat staff por evento — sidebar de canales + área de mensajes con Realtime. */
+/* Chat staff por evento — sidebar de canales + área de mensajes con sondeo. */
 
 const TIPO_LABEL = {
   general: 'General',
@@ -303,46 +303,23 @@ function ChannelView({ evento, channel, usuario }) {
   /* Carga inicial */
   useEffect(() => { cargarMensajes(true); }, [cargarMensajes]);
 
-  /* Realtime: INSERT en chat_messages del canal activo.
-     Sólo hay socket abierto mientras la pestaña se ve — un panel de fondo con
-     el chat abierto mantenía una conexión permanente a Supabase con su latido
-     cada pocos segundos sin que nadie mirara. Al volver a la pestaña se
-     reconecta y se recargan los mensajes por si llegó alguno mientras tanto. */
-  useEffect(() => {
-    let ch = null;
-    const alLlegar = async (payload) => {
-      const row = payload.new;
-      setMessages(prev => {
-        if (prev.some(m => m.id === row.id)) return prev;   // no duplicar los optimistas propios
-        return [...prev, { ...row, autor: { nombre: '...', avatar_url: null } }];
-      });
-      scrollToBottom();
-      /* Autor desde la vista, no de `profiles`: aquí sólo hace falta nombre y
-         foto, y `profiles` entera traía correo y teléfono de otra persona. */
-      const { data } = await supabase
-        .from('perfiles_publicos').select('id, nombre, avatar_url').eq('id', row.user_id).maybeSingle();
-      if (data) setMessages(prev => prev.map(m => m.id === row.id ? { ...m, autor: data } : m));
-    };
+  /* Mensajes nuevos por sondeo, no por Supabase Realtime.
+     ────────────────────────────────────────────────────
+     Era el último canal que seguía abriendo un WebSocket permanente a
+     Supabase (`supabase.channel('chat:…')`) — el mismo peso que ya se le
+     quitó a asistencia en vivo y notificaciones (ver useAsistenciaEnVivo.js
+     y MIGRACION-SUPABASE.md §6, etapa 5). Con varios paneles de staff abiertos
+     durante el evento, cada uno con su socket y su latido, era la carga que
+     terminaba por sentirse contra el proyecto entero de Supabase, no solo
+     contra el chat.
 
-    const conectar = () => {
-      if (ch) return;
-      ch = supabase
-        .channel(`chat:${channel.id}`)
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat_messages', filter: `channel_id=eq.${channel.id}` }, alLlegar)
-        .subscribe();
-    };
-    const desconectar = () => { if (ch) { supabase.removeChannel(ch); ch = null; } };
-
-    const visible = () => typeof document === 'undefined' || document.visibilityState === 'visible';
-    const alCambiar = () => {
-      if (visible()) { cargarMensajes(); conectar(); }
-      else desconectar();
-    };
-
-    if (visible()) conectar();
-    document.addEventListener('visibilitychange', alCambiar);
-    return () => { document.removeEventListener('visibilitychange', alCambiar); desconectar(); };
-  }, [channel.id, scrollToBottom, cargarMensajes]);
+     `useSondeo` ya trae lo que hacía falta: se para cuando la pestaña no se
+     ve, no encadena peticiones si el servidor va lento, y al volver se
+     refresca al instante. 4s de intervalo porque esto SÍ es una
+     conversación —a diferencia del contador de aforo, aquí si tarda se
+     nota—, pero sigue siendo una petición HTTP normal, no una conexión que
+     se queda abierta. */
+  useSondeo(() => cargarMensajes(), 4000, true);
 
   const onEnviar = async (e) => {
     e?.preventDefault();
