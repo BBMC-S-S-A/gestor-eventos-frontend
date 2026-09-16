@@ -79,6 +79,14 @@ export function AuthProvider({ children }) {
       const data = await resp.json();
       if (data?.invitaciones?.length) {
         setInvitacionInfo(data.invitaciones[0]);
+        /* La lista de "Mis eventos" ya pidió sus datos al montar, en paralelo
+           con esta vinculación — puede haber terminado ANTES de que la
+           invitación pasara a 'active', y entonces se queda mostrando "0
+           eventos" hasta que alguien recargue a mano. Este aviso es lo que le
+           dice que vuelva a pedirlos ahora que sí hay algo nuevo que ver. */
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('gestek:refrescar-eventos'));
+        }
       }
     } catch (e) {
       console.warn('[auth] vincularInvitacionesPendientes falló:', e.message);
