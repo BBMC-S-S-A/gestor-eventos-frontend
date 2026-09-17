@@ -186,9 +186,22 @@ export default function ExpositorPage() {
               <textarea className="input resize-none" rows={3} value={f.descripcion}
                 onChange={e => set({ descripcion: e.target.value })} placeholder="¿Qué ofreces? ¿Por qué visitar tu stand?" />
             </div>
-            <div className="field">
-              <label className="label">Categoría <span className="lowercase tracking-normal font-normal text-text-3">(opcional)</span></label>
-              <input className="input" value={f.categoria_negocio} onChange={e => set({ categoria_negocio: e.target.value })} placeholder="Ej. Videojuegos, Comida, Moda" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="field">
+                <label className="label">NIT <span className="lowercase tracking-normal font-normal text-text-3">(opcional)</span></label>
+                {/* Texto, no número: lleva dígito de verificación y a veces se
+                    escribe con guion. Se guarda tal como se escriba. */}
+                <input className="input" value={f.nit} onChange={e => set({ nit: e.target.value })} placeholder="900123456-7" />
+              </div>
+              <div className="field">
+                {/* Decía «Categoría» y la columna se llama `categoria_negocio`,
+                    pero lo que se pide en una rueda de negocios es el SECTOR —y
+                    es lo que ya significaba: `lib/heredarRespuestas.js` declara
+                    «sector» como su primer sinónimo, con una prueba que lo
+                    afirma. Cambia el rótulo, no el almacén. */}
+                <label className="label">Sector <span className="lowercase tracking-normal font-normal text-text-3">(opcional)</span></label>
+                <input className="input" value={f.categoria_negocio} onChange={e => set({ categoria_negocio: e.target.value })} placeholder="Ej. Agroindustria, Software, Turismo" />
+              </div>
             </div>
           </div>
         </div>
@@ -725,6 +738,7 @@ function normaliza(ficha) {
     contacto_telefono: ficha?.contacto_telefono || '',
     sitio_web: ficha?.sitio_web || '',
     categoria_negocio: ficha?.categoria_negocio || '',
+    nit: ficha?.nit || '',
     redes: ficha?.redes || {},
     /* Si su contacto sale en la rueda pública. Son SUS datos y por eso lo
        decide aquí, no sólo el organizador. Nace apagado. */

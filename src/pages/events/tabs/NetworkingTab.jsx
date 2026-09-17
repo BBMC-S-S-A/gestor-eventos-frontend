@@ -1227,6 +1227,11 @@ function ExpositorModal({ eventoId, expositor, onClose, onDone, ocupados = [] })
   const [nombre, setNombre] = useState(expositor?.nombre || '');
   const [stand, setStand] = useState(numeroDeStand(expositor?.stand) || '');
   const [descripcion, setDescripcion] = useState(expositor?.descripcion || '');
+  const [nit, setNit] = useState(expositor?.nit || '');
+  /* El SECTOR. La columna se llama `categoria_negocio` por historia y ya
+     significaba esto: `lib/heredarRespuestas.js` declara «sector» como su
+     primer sinónimo. Lo que faltaba era rotularlo así donde se escribe. */
+  const [sector, setSector] = useState(expositor?.categoria_negocio || '');
   /* Quién recibe y quién pasa. `comprador` por defecto porque es lo que se
      crea casi siempre: en una rueda se sientan pocos y pasan muchos. */
   const [rol, setRol] = useState(expositor?.rol || 'comprador');
@@ -1259,6 +1264,8 @@ function ExpositorModal({ eventoId, expositor, onClose, onDone, ocupados = [] })
          «Stand C10»— se reconozcan como repetidas. */
       stand: numeroDeStand(stand) || null,
       descripcion: descripcion.trim() || null,
+      nit: nit.trim() || null,
+      categoria_negocio: sector.trim() || null,
       rol,
       contacto_publico: contactoPublico,
     };
@@ -1290,6 +1297,20 @@ function ExpositorModal({ eventoId, expositor, onClose, onDone, ocupados = [] })
           <div className="field">
             <label className="label">Nombre</label>
             <input value={nombre} onChange={e => setNombre(e.target.value)} className="input rounded-2xl py-3" placeholder="Nombre de la empresa" required autoFocus />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="field">
+              <label className="label">NIT <span className="text-text-3 lowercase font-normal">(opcional)</span></label>
+              {/* Texto y no número: un NIT no se suma, lleva dígito de
+                  verificación que a veces se escribe pegado con guion, y una
+                  empresa de fuera trae un documento con otra forma. Se guarda
+                  como lo escribió quien lo escribió. */}
+              <input value={nit} onChange={e => setNit(e.target.value)} className="input rounded-2xl py-3" placeholder="900123456-7" />
+            </div>
+            <div className="field">
+              <label className="label">Sector <span className="text-text-3 lowercase font-normal">(opcional)</span></label>
+              <input value={sector} onChange={e => setSector(e.target.value)} className="input rounded-2xl py-3" placeholder="Agroindustria, software…" />
+            </div>
           </div>
           <div className="field">
             <label className="label">Stand <span className="text-text-3 lowercase font-normal">(opcional)</span></label>
@@ -1356,8 +1377,19 @@ function ExpositorModal({ eventoId, expositor, onClose, onDone, ocupados = [] })
           </div>
 
           <div className="field">
-            <label className="label">Descripción <span className="text-text-3 lowercase font-normal">(opcional)</span></label>
-            <textarea value={descripcion} onChange={e => setDescripcion(e.target.value)} rows={2} className="input rounded-2xl py-3 resize-none" placeholder="A qué se dedican, qué ofrecen..." />
+            {/* La misma columna, preguntada según el papel.
+              *
+              * En una rueda no se pide lo mismo a los dos lados: quien vende
+              * describe su producto y quien compra describe el reto que quiere
+              * resolver. Es UNA columna (`descripcion`) y dos preguntas, no dos
+              * columnas — con dos habría que decidir qué se pierde cuando
+              * alguien cambia de papel, y la respuesta sería perder lo escrito. */}
+            <label className="label">
+              {rol === 'vendedor' ? 'Descripción del producto' : 'Descripción del reto'}
+              <span className="text-text-3 lowercase font-normal"> (opcional)</span>
+            </label>
+            <textarea value={descripcion} onChange={e => setDescripcion(e.target.value)} rows={2} className="input rounded-2xl py-3 resize-none"
+              placeholder={rol === 'vendedor' ? 'Qué ofrece y a quién le sirve…' : 'Qué necesita resolver o qué está buscando…'} />
             <p className="text-xs text-text-3 mt-1.5">Ayuda a los asistentes a decidir si les interesa agendar cita.</p>
           </div>
           <div className="flex gap-3 pt-2">
