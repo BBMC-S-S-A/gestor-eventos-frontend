@@ -39,8 +39,13 @@
    stand, canje del panel y el portal del expositor. Vive aquí y no dentro de
    una pantalla porque cinco copias de esto acabarían separándose. */
 
-/* Mismo alfabeto que `lib/codigos.js` en el backend: sin I, O, 0 ni 1. */
-const CODIGO_CORTO = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{8}$/i;
+/* Un código corto: letras y números, sin puntos ni barras, del largo que acepta
+   el cuadro «Ingresa el código» (4 a 12, con margen). No se exige el alfabeto
+   de `lib/codigos.js`: los códigos emitidos antes de unificar el generador
+   pueden llevar 0, 1, O o I, y un QR que no encaja en el patrón caía como
+   `qr_token` y el servidor lo rechazaba. Un token firmado nunca pasa por aquí:
+   siempre lleva dos puntos y cientos de caracteres. */
+const CODIGO_CORTO = /^[A-Z0-9]{4,16}$/i;
 
 export function leerQr(texto) {
   const s = String(texto || '').trim();

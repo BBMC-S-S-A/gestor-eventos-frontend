@@ -28,8 +28,11 @@ test('un token firmado (JWT) se sigue mandando como qr_token', () => {
   assert.deepEqual(leerQr(jwt), { qr_token: jwt });
 });
 
-test('algo que no es ni URL ni un código de 8 caracteres cae a qr_token', () => {
-  /* Nueve caracteres no es un código corto válido: mejor dejarlo caer al
-     camino de siempre que adivinar un cuarto formato. */
-  assert.deepEqual(leerQr('ABCDEFGHJ'), { qr_token: 'ABCDEFGHJ' });
+test('un código viejo con 0, 1, O o I también se manda como codigo', () => {
+  assert.deepEqual(leerQr('AB10OI99'), { codigo: 'AB10OI99' });
+});
+
+test('lo que lleva puntos o espacios cae a qr_token', () => {
+  assert.deepEqual(leerQr('abc.def.ghi'), { qr_token: 'abc.def.ghi' });
+  assert.deepEqual(leerQr('hola mundo'), { qr_token: 'hola mundo' });
 });
