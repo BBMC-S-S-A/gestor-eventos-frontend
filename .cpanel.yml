@@ -9,12 +9,39 @@
 #   $HOME ya apunta a /home/TU_USUARIO, así que normalmente solo cambia
 #   'public_html' si usas un subdominio.
 #
-#   Si tu cPanel NO tiene Node/npm disponible en el deploy y el build falla,
-#   avísame: pasamos a construir localmente y subir solo el dist/ (plan B).
+# ── El fallo del 16 de septiembre, y por qué está el NODE_OPTIONS ─────────
+#
+# El despliegue terminaba en verde en el panel y la carpeta pública se
+# quedaba con los archivos de la vez anterior. En el log
+# (~/.cpanel/logs/vc_*_git_deploy.log) estaba la razón:
+#
+#     added 562 packages in 4s        ← npm ci fue bien
+#     > vite build
+#     RangeError: WebAssembly.instantiate(): Out of memory:
+#                 Cannot allocate Wasm memory for new instance
+#     Task completed with exit code 1
+#
+# El build se quedó sin memoria. Al salir con código 1, el `&&` cortó la
+# cadena y la tarea de copiar NUNCA corrió — sin error visible en el panel.
+#
+# Lo que lo delata: ese mismo `npm run build` en una sesión de Terminal
+# tarda 7 segundos y no falla. El gestor de tareas de cPanel corre con un
+# límite de memoria más apretado que una sesión interactiva, y ahí no cabe.
+#
+# `--max-old-space-size=512` va en esa dirección aunque parezca al revés:
+# no pide más memoria, le pone techo al montón de V8 para que recoja basura
+# antes y deje sitio a las reservas nativas —el WASM de undici es la que
+# reventó—. En un entorno con cupo, un V8 que crece sin freno es justo lo
+# que no deja espacio para lo demás.
+#
+# Si aun así vuelve a fallar por memoria, el camino es sacar el build de
+# aquí: construir en Terminal (donde sí cabe) y dejar que esta tarea sólo
+# copie. Queda documentado en SUBIR.md.
 deployment:
   tasks:
     - export DEPLOYPATH=$HOME/public_html
-    # Build (usa el login shell para tomar node/npm si están vía "Setup Node.js App")
-    - /bin/bash -lc 'npm ci --no-audit --no-fund && npm run build'
-    # Publica: limpia y copia el dist (incluye .htaccess) a la carpeta pública
-    - /bin/bash -lc 'mkdir -p "$DEPLOYPATH" && cp -R dist/. "$DEPLOYPATH"/'
+    # Build. El `cd` es explícito para no depender del directorio de trabajo
+    # con el que el gestor de tareas invoque el shell.
+    - /bin/bash -lc 'cd "$HOME/gestek-frontend" && export NODE_OPTIONS="--max-old-space-size=512" && npm ci --no-audit --no-fund && npm run build'
+    # Publica: copia el dist (incluye .htaccess) a la carpeta pública.
+    - /bin/bash -lc 'cd "$HOME/gestek-frontend" && mkdir -p "$DEPLOYPATH" && cp -R dist/. "$DEPLOYPATH"/'
