@@ -33,7 +33,7 @@ const leer = (p) => readFileSync(join(RAIZ, p), 'utf8');
    no hace falta un parser de Apache ni de JSON para esto. */
 function rutasEmbebiblesDeHtaccess(src) {
   const rutas = [];
-  const bloque = /<If\s+"%\{REQUEST_URI\}\s*=~\s*m#\^\/([a-z|()]+)\/#">([\s\S]*?)<\/If>/gi;
+  const bloque = /<If\s+"%\{(?:THE_REQUEST|REQUEST_URI)\}\s*=~\s*m#\^(?:\\S\+\\s)?\/([a-z|()]+)\/#">([\s\S]*?)<\/If>/gi;
   let m;
   while ((m = bloque.exec(src))) {
     if (!/frame-ancestors \*/.test(m[2])) continue;
@@ -75,6 +75,16 @@ test('.htaccess, _headers y vercel.json declaran embebibles las mismas rutas', (
     `.htaccess (${deHtaccess.join(', ')}) y _headers (${deHeaders.join(', ')}) no coinciden`);
   assert.deepEqual(deHtaccess, deVercel,
     `.htaccess (${deHtaccess.join(', ')}) y vercel.json (${deVercel.join(', ')}) no coinciden`);
+});
+
+test('las excepciones del .htaccess miran THE_REQUEST, no REQUEST_URI', () => {
+  /* La RewriteRule a index.html es una redirección interna: al evaluar el <If>
+     REQUEST_URI ya vale "/index.html" y la excepción no se aplica nunca. Pasó
+     en producción: /embed/ salía con frame-ancestors 'self' y el iframe de
+     registro de FESTECH quedaba en blanco. */
+  const src = leer('public/.htaccess');
+  assert.ok(!/<If\s+"%\{REQUEST_URI\}/.test(src),
+    'un <If> sobre REQUEST_URI no coincide tras la reescritura a index.html');
 });
 
 test('/explorar (la página pública, la que se incrusta de verdad) está entre las embebibles', () => {
