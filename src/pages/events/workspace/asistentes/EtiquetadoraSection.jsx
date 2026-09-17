@@ -128,19 +128,28 @@ export default function EtiquetadoraSection({ evento }) {
    * saber si el DISEÑO está bien —separado del problema del driver— es
    * imprimir esta imagen desde el Visor de fotos de Windows, a tamaño real.
    * Si ahí sale limpia, el diseño no tiene nada que arreglar. */
-  const descargarVistaPrevia = async () => {
+  /* `sencilla`: QR, código, nombre y correo — sin el rol ni el nombre del
+   * evento. Es la que se pidió para imprimir a mano desde cualquier programa:
+   * una imagen que no hay que configurar. El generador omite el chip del tipo
+   * cuando no hay tipo, y la línea pequeña de debajo del nombre —la del
+   * evento— se reutiliza para el correo. */
+  const descargarVistaPrevia = async (sencilla = false) => {
     setGenerandoPng(true);
     try {
-      const ticket = aImprimir[0] || { guest_nombre: 'María Restrepo', codigo: 'ABC123' };
+      const base = aImprimir[0] || { guest_nombre: 'María Restrepo', guest_email: 'maria@correo.com', codigo: 'ABC123' };
+      const correo = base.guest_email || base.usuario?.email || base.asistente?.email || '';
+      const ticket = sencilla ? { ...base, tipo: null } : base;
       const ok = await descargarEtiquetaPng({
         etiqueta: etq,
         ticket,
-        evento,
+        evento: sencilla ? { titulo: correo } : evento,
         qrValue: valorQr(etq, ticket),
-        destacados,
+        destacados: sencilla ? [] : destacados,
         logoUrl: cfg.logo_url || '',
         mostrarCodigo: cfg.mostrar?.codigo !== false,
-      }, `${etq.nombre}-vista-previa`);
+      }, sencilla
+        ? `escarapela-${String(base.codigo || 'muestra').replace(/[^\w.-]+/g, '-').slice(0, 60)}`
+        : `${etq.nombre}-vista-previa`);
       if (!ok) toastErr('No se pudo generar el PNG con estas medidas.');
     } catch (e) { toastErr(e.message); }
     finally { setGenerandoPng(false); }
@@ -413,7 +422,11 @@ export default function EtiquetadoraSection({ evento }) {
             <button onClick={descargarQrSuelto} disabled={!!problema} className="btn-ghost btn-sm">
               Descargar QR
             </button>
-            <button onClick={descargarVistaPrevia} disabled={generandoPng || !!problema} className="btn-ghost btn-sm">
+            <button onClick={() => descargarVistaPrevia(true)} disabled={generandoPng || !!problema} className="btn-ghost btn-sm"
+              title="La escarapela como imagen con QR, código, nombre y correo: sin rol ni nombre del evento. Para imprimirla desde cualquier programa.">
+              {generandoPng ? 'Generando…' : 'Descargar escarapela (imagen)'}
+            </button>
+            <button onClick={() => descargarVistaPrevia(false)} disabled={generandoPng || !!problema} className="btn-ghost btn-sm">
               {generandoPng ? 'Generando…' : 'Descargar PNG'}
             </button>
           </div>
