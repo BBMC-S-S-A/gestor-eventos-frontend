@@ -34,7 +34,7 @@ import { ETIQUETA_DEFECTO, normalizarEtiqueta } from '../../lib/etiquetaTermica.
  * hasta no probar en el aparato no se sabe si hace falta. */
 
 export default function ImprimirEtiquetas({
-  tickets = [], evento = {}, destacados = [], logoUrl = '', mostrarCodigo = true,
+  tickets = [], logoUrl = '', mostrarCodigo = true,
   /* Las medidas del rollo. El `@page` de abajo TIENE que coincidir con ellas:
      si el papel declarado y el dibujo no miden lo mismo, la impresora escala y
      el QR pierde la relación puntos↔módulos que lo hace legible. */
@@ -52,9 +52,7 @@ export default function ImprimirEtiquetas({
             <EtiquetaTermica
               etiqueta={E}
               ticket={t}
-              evento={evento}
               qrValue={qrDe ? qrDe(t) : (t.qr_token || t.codigo)}
-              destacados={destacados}
               logoUrl={logoUrl}
               mostrarCodigo={mostrarCodigo}
             />

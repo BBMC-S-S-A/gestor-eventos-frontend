@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Html5Qrcode } from 'html5-qrcode';
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 
 /* Escáner de QR con cámara, a pantalla completa.
    Extraído de CheckinTab para que lo usen también los stands: la misma
@@ -39,21 +39,48 @@ export default function QrScanner({
   useEffect(() => {
     if (!active) return;
     let cancelado = false;
-    const scanner = new Html5Qrcode(containerId);
+    /* Sólo QR, y con el detector nativo del navegador cuando lo hay: es mucho
+       mejor que el de JavaScript con códigos pequeños. */
+    const scanner = new Html5Qrcode(containerId, {
+      verbose: false,
+      formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+      experimentalFeatures: { useBarCodeDetectorIfSupported: true },
+    });
     scannerRef.current = scanner;
 
-    scanner.start(
-      { facingMode: 'environment' },
-      { fps: 10, qrbox: calcularQrBox(), aspectRatio: 1 },
-      (decoded) => {
-        /* Dedupe: ignora el mismo código dentro de 3 segundos. */
-        const now = Date.now();
-        if (lastScanRef.current.value === decoded && now - lastScanRef.current.at < 3000) return;
-        lastScanRef.current = { value: decoded, at: now };
-        onScanRef.current?.(decoded);
+    const alLeer = (decoded) => {
+      /* Dedupe: ignora el mismo código dentro de 3 segundos. */
+      const now = Date.now();
+      if (lastScanRef.current.value === decoded && now - lastScanRef.current.at < 3000) return;
+      lastScanRef.current = { value: decoded, at: now };
+      onScanRef.current?.(decoded);
+    };
+
+    /* ── Por qué se pide resolución y enfoque ─────────────────────────────
+     *
+     * Con `aspectRatio: 1` y sin restricciones el navegador abría la cámara a
+     * su resolución más baja. Un QR de escarapela grande se leía igual, pero
+     * el de una etiqueta pequeña —el del código corto, ~18 mm— ocupaba tan
+     * pocos píxeles que la cámara «no reaccionaba»: la imagen de la etiqueta
+     * se decodifica bien, lo que no llegaba era el detalle. */
+    const configBuena = {
+      fps: 15,
+      qrbox: calcularQrBox(),
+      videoConstraints: {
+        facingMode: 'environment',
+        width: { ideal: 1920 },
+        height: { ideal: 1080 },
+        advanced: [{ focusMode: 'continuous' }],
       },
-      () => { /* errores de lectura silenciosos */ }
-    ).catch(e => { if (!cancelado) setErr(e.message || 'No se pudo iniciar la cámara.'); });
+    };
+    const configSencilla = { fps: 10, qrbox: calcularQrBox() };
+
+    scanner.start({ facingMode: 'environment' }, configBuena, alLeer, () => {})
+      /* Hay móviles que rechazan las restricciones: se abre como antes antes
+         que dejar la puerta sin cámara. */
+      .catch(() => cancelado ? null
+        : scanner.start({ facingMode: 'environment' }, configSencilla, alLeer, () => {}))
+      .catch(e => { if (!cancelado) setErr(e.message || 'No se pudo iniciar la cámara.'); });
 
     return () => {
       cancelado = true;

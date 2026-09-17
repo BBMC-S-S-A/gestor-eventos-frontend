@@ -52,7 +52,7 @@ import {
  * viven en tres tablas distintas, y el backend pide un permiso distinto para
  * cada una:
  *
- *   la zona en sí → `page_json`               → `editar_pagina_publica`
+ *   la zona en sí → `page_json.zonas`         → `gestionar_zonas` | `editar_pagina_publica` | `editar_evento`
  *   la actividad  → `agenda_sessions.zona_id` → `gestionar_agenda` | `editar_evento`
  *   el stand      → `networking_expositores`  → `gestionar_expositores` | `editar_evento`
  *
@@ -85,7 +85,7 @@ const limpiar = (l) => (l || []).map(({ id, nombre, aforo_max, tipo }) =>
 const VACIA = { dentro: 0, entradas: 0, salidas: 0, excedido: 0, agenda: [], ahora: [], siguiente: null, stands: [] };
 
 export default function ZonasSection({ evento, soyOwner = false, permisos, reload }) {
-  const puedeEditar = puedeCon(soyOwner, permisos, ['editar_pagina_publica']);
+  const puedeEditar = puedeCon(soyOwner, permisos, ['gestionar_zonas', 'editar_pagina_publica', 'editar_evento']);
   const puedeAgenda = puedeCon(soyOwner, permisos, ['gestionar_agenda', 'editar_evento']);
   const puedeStands = puedeCon(soyOwner, permisos, ['gestionar_expositores', 'editar_evento']);
 

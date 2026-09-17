@@ -158,8 +158,10 @@ const SECCIONES = [
      contesta «cómo va ahora mismo» y es donde se opera, de pie y con cola
      delante — por eso lleva el permiso de check-in y no el del dueño. */
   { id: 'zonas', label: 'Zonas del evento', icon: PinIcon, tabs: [
-    { id: 'zonas',   label: 'Zonas de interés',   perm: 'checkin' },
-    { id: 'mapa',    label: 'Mapa del evento',    perm: 'editar_evento' },
+    /* `gestionar_zonas` abre las dos: quien dibuja el recinto crea las zonas
+       y las coloca en el plano sin necesitar el evento entero. */
+    { id: 'zonas',   label: 'Zonas de interés',   perm: ['gestionar_zonas', 'checkin'] },
+    { id: 'mapa',    label: 'Mapa del evento',    perm: ['gestionar_zonas', 'editar_evento'] },
     { id: 'aforo',   label: 'Aforo por zonas',    perm: 'checkin' },
     /* `gestionar_expositores` primero: es LA pantalla del rol «Coordinación de
        expositores», y pidiendo sólo `checkin` ese rol no podía abrir su propia
