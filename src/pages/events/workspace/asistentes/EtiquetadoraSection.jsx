@@ -12,6 +12,7 @@ import { useToast } from '../../../../context/ToastContext.jsx';
 import MedirConFoto from './MedirConFoto.jsx';
 import { impresionConfig } from '../../../../lib/wallet.js';
 import { descargarEtiquetaPng, imprimirComoPng } from '../../../../lib/etiquetaPng.js';
+import { qrPng } from '../../../../lib/qrPng.jsx';
 
 /* Asistentes · Imprimir en etiquetadora.
  *
@@ -143,6 +144,31 @@ export default function EtiquetadoraSection({ evento }) {
       if (!ok) toastErr('No se pudo generar el PNG con estas medidas.');
     } catch (e) { toastErr(e.message); }
     finally { setGenerandoPng(false); }
+  };
+
+  /* Solo el QR, sin el resto de la escarapela: para mandarlo suelto —por
+   * WhatsApp, por ejemplo— o para probar si el lector lo lee bien aparte del
+   * diseño. Usa el mismo generador de canvas que ya usan la boleta del
+   * asistente y la tarjeta descargable (`lib/qrPng.jsx`), no uno nuevo.
+   *
+   * Se dispara la descarga aquí mismo, igual que `descargarEtiquetaPng` más
+   * abajo, en vez de llamar a `descargarQrPng`: esa función es sólo para la
+   * entrada (boleta/tarjeta), y `tests/entrada.test.mjs` impide llamarla desde
+   * fuera de `DescargarEntrada.jsx` a propósito —es la prueba que evita que
+   * una pantalla calcule su propio valor de QR para la puerta—. Esta pantalla
+   * no es la entrada: es la pieza física de la etiquetadora, con su propio
+   * `valorQr` de `piezasBranding.js`, así que sólo toma prestado el trazador
+   * de canvas (`qrPng`), no el flujo de la entrada. */
+  const descargarQrSuelto = () => {
+    const ticket = aImprimir[0] || { guest_nombre: 'María Restrepo', codigo: 'ABC123' };
+    const dataUrl = qrPng(valorQr(etq, ticket), 720);
+    if (!dataUrl) { toastErr('No se pudo generar el QR.'); return; }
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `qr-${String(ticket.codigo || 'muestra').replace(/[^\w.-]+/g, '-').slice(0, 60)}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   };
 
   /* La alternativa a `window.print()` de más abajo: en vez de mandar el HTML
@@ -383,9 +409,14 @@ export default function EtiquetadoraSection({ evento }) {
       <div className="no-print">
         <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
           <p className="text-xs text-text-3">Así sale, a tamaño real:</p>
-          <button onClick={descargarVistaPrevia} disabled={generandoPng || !!problema} className="btn-ghost btn-sm">
-            {generandoPng ? 'Generando…' : 'Descargar PNG'}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={descargarQrSuelto} disabled={!!problema} className="btn-ghost btn-sm">
+              Descargar QR
+            </button>
+            <button onClick={descargarVistaPrevia} disabled={generandoPng || !!problema} className="btn-ghost btn-sm">
+              {generandoPng ? 'Generando…' : 'Descargar PNG'}
+            </button>
+          </div>
         </div>
         <div className="inline-block bg-white rounded-xl p-2 ring-1 ring-black/10">
           <EtiquetaTermica

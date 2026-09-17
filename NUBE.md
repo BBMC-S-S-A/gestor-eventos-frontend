@@ -75,7 +75,12 @@ Los dos son **públicos en la misma cuenta**, van por `main`, y **un push a
 | | Repo | Corre en | Producción |
 |---|---|---|---|
 | Panel y público | `gestor-eventos-frontend` | React + Vite | https://gestekeventost.dpdns.org |
-| API | `gestor-eventos-backend` | Express (Node 22) | https://gestor-eventos-backend-yx75.onrender.com |
+| API | `gestor-eventos-backend` | Express (Node 22) | https://api.gestekeventost.dpdns.org |
+
+> **Render y Vercel están fuera desde el 17-sep.** Los dos repos se despliegan
+> en **cPanel**. El host viejo (`gestor-eventos-backend-yx75.onrender.com`)
+> contesta **503**: cualquier cosa que siga apuntando ahí —un conector MCP
+> guardado, un webhook, un marcador— hay que cambiarla a mano.
 
 Base de datos: **Supabase** `yopontbwgdybfsniqawz`, Postgres 17, **plan free**.
 
@@ -106,7 +111,7 @@ hacer check-in y listar agenda sin pasar por el panel. Se añade en *Claude →
 Configuración → Conectores → Añadir conector personalizado*:
 
 ```
-https://gestor-eventos-backend-yx75.onrender.com/mcp
+https://api.gestekeventost.dpdns.org/mcp
 ```
 
 Claude descubre el OAuth solo. **Ojo con dos cosas**: el conector sólo ve los
@@ -128,7 +133,7 @@ del 15 de agosto se encontraron leyendo y con el linter, no en pantalla — y
 quedaron sin confirmar visualmente por esto.
 
 **Secretos.** No están en el repo y no deben estarlo. Los pone una persona en
-Render. Ver `DESPLIEGUE.md` y la sección 3 de `CONTEXTO.md`.
+cPanel. Ver `DESPLIEGUE.md` y la sección 3 de `CONTEXTO.md`.
 
 ---
 
@@ -164,11 +169,11 @@ Vite parte el código y las pantallas viven en chunks perezosos. Lo que sí
 funciona, y es lo más rápido, es preguntarle al servicio por el dato:
 
 ```bash
-curl -s https://gestor-eventos-backend-yx75.onrender.com/eventos/publicos/slug/festech | head -c 400
+curl -s https://api.gestekeventost.dpdns.org/eventos/publicos/slug/festech | head -c 400
 ```
 
-Render tarda entre 40 segundos y 3 minutos. Conviene esperar en bucle en vez de
-mirar a ojo:
+El despliegue tarda un rato en quedar servido. Conviene esperar en bucle en vez
+de mirar a ojo:
 
 ```bash
 for i in $(seq 1 10); do
@@ -312,7 +317,7 @@ Lo que le falta a Festech, y **no es código**:
 
 ### Pendiente que necesita a una persona
 
-- **`MP_WEBHOOK_SECRET`** en Render. El código está listo y el servidor avisa al
+- **`MP_WEBHOOK_SECRET`** en cPanel. El código está listo y el servidor avisa al
   arrancar si falta. Ojo: el diagnóstico viejo («cualquiera marca una boleta como
   pagada») **era falso** — el pago se reverifica contra Mercado Pago. Lo que se
   cerró fue un amplificador de peticiones.
