@@ -321,7 +321,13 @@
   .pantalla-kiosco a[target="_blank"] { display: none !important; }
 
   /* Los tramos ya recorridos de la barra de pasos. */
-  .paso-marca { background: var(--brand-primary, rgb(var(--color-primary))); }
+  /* La marca, pero garantizando que se DISTINGA del fondo. Con
+     `--brand-primary` a secas, un evento con la marca en azul marino
+     (#00003A sobre #1A1A1A, caso real) pintaba una barra invisible: el
+     formulario decía «Paso 1 de 3» y no se veía cuánto faltaba.
+     `--brand-marca-visible` la calcula `BrandingProvider` conservando el tono;
+     el respaldo es el de siempre, para cuando no hay marca de evento. */
+  .paso-marca { background: var(--brand-marca-visible, var(--brand-primary, rgb(var(--color-primary)))); }
 
   .btn-sm  { @apply text-sm px-3.5 py-2 rounded-lg; }
   .btn-lg  { @apply text-base px-6 py-3 rounded-2xl; }

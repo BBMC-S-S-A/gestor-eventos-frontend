@@ -149,3 +149,93 @@ export function botonDeMarca(color) {
   }
   return { fondo: aHex(f), texto };
 }
+
+/* ── La marca, cuando tiene que VERSE sobre el fondo ──────────────────────
+ *
+ * `botonDeMarca` resuelve el problema de arriba: texto legible DENTRO del
+ * color. Esto resuelve el de al lado: que el color se distinga DEL FONDO.
+ *
+ * Nace de un caso real. FESTECH tiene `primary: #00003A` —azul marino casi
+ * negro— sobre un fondo `#1A1A1A`. La barra de pasos del formulario pintaba
+ * fielmente el color de la marca y quedaba invisible: quien se registraba no
+ * veía en qué paso iba ni cuánto le faltaba, que es justo lo que esa barra
+ * existe para decir.
+ *
+ * No es un color «mal elegido». Un azul marino es perfecto en un logo sobre
+ * blanco; deja de serlo como marca de progreso sobre negro. El color no se
+ * cambia: se aclara u oscurece lo justo para despegarlo del fondo, conservando
+ * el tono. Un azul marino sigue saliendo azul.
+ *
+ * El umbral es 3:1, que es el que la WCAG pide para lo que NO es texto
+ * (1.4.11): un indicador, un borde, un icono. Pedirle 4.5 lo empujaría a un
+ * pastel que ya no se parecería a la marca.
+ */
+const CONTRASTE_NO_TEXTO = 3;
+
+export function marcaVisibleSobre(color, fondo) {
+  const rgb = aRGB(color);
+  const fon = aRGB(fondo);
+  /* Un color que no entendemos no es motivo para inventarse otro. */
+  if (!rgb || !fon) return null;
+  if (contraste(rgb, fon) >= CONTRASTE_NO_TEXTO) return aHex(rgb);
+
+  /* Hacia donde haya sitio: sobre fondo oscuro se aclara, sobre claro se
+     oscurece. Pasos del 8%, hasta 14 — suficiente para cruzar de punta a
+     punta, y con tope para no quedarse dando vueltas si algo no cuadra. */
+  const fondoOscuro = luminancia(fon) < 0.5;
+  let c = rgb;
+  for (let i = 0; i < 14 && contraste(c, fon) < CONTRASTE_NO_TEXTO; i++) {
+    c = fondoOscuro
+      ? c.map(v => v + (255 - v) * 0.08)
+      : c.map(v => v * 0.92);
+  }
+  return aHex(c);
+}
+
+/* ── La paleta entera del formulario, a partir de la marca ────────────────
+ *
+ * El problema que resuelve: un evento con su marca puesta abría un formulario
+ * mitad suyo y mitad nuestro. El botón, el foco y la barra de pasos ya
+ * llevaban la marca —eso estaba hecho—, pero las píldoras de «¿ya te
+ * registraste antes?», los avisos y los enlaces seguían saliendo en el ámbar
+ * de la plataforma, porque usan las utilidades `accent` y `primary`.
+ *
+ * Esas utilidades se alimentan de variables CSS (`--color-accent` y compañía,
+ * en «R G B»). Así que en vez de perseguir clase por clase —una lista que se
+ * queda corta en cuanto alguien añade un `bg-accent/10` más—, se redefinen las
+ * variables DENTRO de `.brand-scope`. Todo lo de dentro sigue a la marca solo,
+ * y el panel, que está fuera del scope, no se entera.
+ *
+ * ── Por qué el acento sale del primario y no del acento de la marca ──
+ *
+ * Porque el acento de la marca puede ser cualquier cosa. FESTECH lo tiene en
+ * blanco, y en el formulario hay un `bg-accent text-white`: con el acento en
+ * blanco eso es texto blanco sobre fondo blanco. Un tono más claro del
+ * primario da la misma sensación de familia —el azul con sus derivados— sin
+ * poder chocar nunca con un color de texto fijo.
+ */
+const tripleta = (rgb) => rgb.map(v => Math.round(Math.min(255, Math.max(0, v)))).join(' ');
+const haciaBlanco = (rgb, k) => rgb.map(v => v + (255 - v) * k);
+const haciaNegro  = (rgb, k) => rgb.map(v => v * (1 - k));
+
+export function paletaDeMarca(primary, fondo) {
+  const base = aRGB(marcaVisibleSobre(primary, fondo) || primary);
+  const fon  = aRGB(fondo);
+  if (!base) return null;
+
+  /* «Claro» y «oscuro» son relativos al fondo, no absolutos: sobre un fondo
+     oscuro, el tono claro es el que destaca. Al revés en uno claro. */
+  const fondoOscuro = !fon || luminancia(fon) < 0.5;
+  const claro = fondoOscuro ? haciaBlanco(base, 0.28) : haciaNegro(base, 0.28);
+  const oscuro = fondoOscuro ? haciaNegro(base, 0.22) : haciaBlanco(base, 0.22);
+
+  const t = { base: tripleta(base), claro: tripleta(claro), oscuro: tripleta(oscuro) };
+  return {
+    '--color-primary'      : t.base,
+    '--color-primary-light': t.claro,
+    '--color-primary-dark' : t.oscuro,
+    '--color-accent'       : t.base,
+    '--color-accent-light' : t.claro,
+    '--color-accent-dark'  : t.oscuro,
+  };
+}

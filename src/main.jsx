@@ -51,7 +51,27 @@ const MEDIA_HORA = 30 * 60 * 1000;
  * confusión en un clic. No se recarga solo a propósito: puede haber un
  * formulario a medias, o la cola de escaneos de la puerta abierta, y perder
  * eso por una versión nueva es peor que la versión vieja. */
+/* Dónde NO se avisa: la parte pública, que es de marca blanca.
+ *
+ * El aviso es para quien OPERA —el equipo en la puerta, quien organiza—, que
+ * es quien se beneficia de saber que hay algo nuevo. Quien llega a rellenar un
+ * formulario no despliega nada: para esa persona el aviso no es útil, es una
+ * caja que le tapa el formulario a mitad de escribir.
+ *
+ * Y sobre todo: esas páginas llevan la marca del organizador, no la nuestra.
+ * Un cartel de la plataforma asomando en la web de otro rompe justo lo que se
+ * vende. Por eso el texto tampoco nombra ya a nadie: si algún día se enseña
+ * donde no toca, al menos no dirá de quién es. */
+const RUTAS_PUBLICAS = [
+  '/explorar', '/mi-ticket', '/acreditar', '/verificar', '/expositor', '/equipo',
+];
+const enParteBlanca = () => {
+  const p = location.pathname;
+  return RUTAS_PUBLICAS.some(r => p === r || p.startsWith(r + '/'));
+};
+
 function avisarDeVersionNueva(actualizar) {
+  if (enParteBlanca()) return;
   if (document.getElementById('gestek-version-nueva')) return;
 
   const caja = document.createElement('div');
@@ -69,7 +89,7 @@ function avisarDeVersionNueva(actualizar) {
   ].join(';');
 
   const texto = document.createElement('span');
-  texto.textContent = 'Hay una versión nueva de GESTEK.';
+  texto.textContent = 'Hay una versión nueva.';
   const boton = document.createElement('button');
   boton.type = 'button';
   boton.textContent = 'Actualizar';

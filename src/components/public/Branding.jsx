@@ -3,7 +3,7 @@
    header con tagline + redes, y footer. */
 
 import { t } from '../../lib/i18n.js';
-import { botonDeMarca } from '../../lib/esquemaAnfitrion.js';
+import { botonDeMarca, marcaVisibleSobre, paletaDeMarca } from '../../lib/esquemaAnfitrion.js';
 
 const FONTS = {
   sans   : "'Inter', system-ui, sans-serif",
@@ -39,6 +39,17 @@ export function BrandingProvider({ organizador, children }) {
   const font    = FONTS[b.font] || null;
   const radius  = RADIUS[b.radius];
   const boton   = botonDeMarca(primary);
+  /* El mismo color de marca, pero visible SOBRE EL FONDO. Se usa donde la
+     marca no lleva nada encima y sólo tiene que distinguirse: la barra de
+     pasos del formulario. Con `primary` a secas, una marca oscura sobre fondo
+     oscuro pintaba una barra que no se veía — y esa barra existe justo para
+     decirle a quien se registra cuánto le falta. */
+  const marcaVisible = marcaVisibleSobre(primary, bg) || primary;
+
+  /* Y la paleta entera, para que el formulario no salga mitad de la marca y
+     mitad de la plataforma. Ver `paletaDeMarca`: redefine las variables de las
+     que comen las utilidades `primary`/`accent`, sólo dentro de este scope. */
+  const paleta = paletaDeMarca(primary, bg) || {};
 
   return (
     <div
@@ -47,6 +58,8 @@ export function BrandingProvider({ organizador, children }) {
         '--brand-primary': primary,
         '--brand-accent' : accent,
         '--brand-glow'   : `${primary}30`,
+        '--brand-marca-visible': marcaVisible,
+        ...paleta,
         /* El botón que lleva la marca: su fondo y el texto que se lee encima.
            Sin esto, un botón dorado con el texto claro de siempre queda
            ilegible; y un morado medio no se lee con ninguno de los dos. */
