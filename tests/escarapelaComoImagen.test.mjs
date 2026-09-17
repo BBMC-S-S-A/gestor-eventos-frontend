@@ -55,8 +55,12 @@ test('la pantalla de la etiquetadora ofrece las dos salidas', () => {
   /* Los dos botones tienen que poder desactivarse cuando el QR no cabe — lo
      mismo que ya vale para «Imprimir N etiquetas»; si no, alguien genera cien
      PNG ilegibles antes de enterarse de que hay que ajustar las medidas. */
-  assert.match(seccion, /onClick=\{descargarVistaPrevia\}\s+disabled=\{generandoPng \|\| !!problema\}/,
-    'el botón de descargar PNG no se desactiva cuando la escarapela no cabe');
+  /* Dos descargas: la escarapela sencilla (nombre y correo) y la completa. */
+  for (const variante of ['true', 'false']) {
+    assert.match(seccion,
+      new RegExp(`onClick=\\{\\(\\) => descargarVistaPrevia\\(${variante}\\)\\}\\s+disabled=\\{generandoPng \\|\\| !!problema\\}`),
+      `el botón de descargar PNG (${variante === 'true' ? 'sencilla' : 'completa'}) no se desactiva cuando la escarapela no cabe`);
+  }
   assert.match(seccion, /onClick=\{imprimirPorPng\}\s+disabled=\{!!problema \|\| imprimiendoPng\}/,
     'el botón de imprimir por imagen no se desactiva cuando la escarapela no cabe');
 });

@@ -16,9 +16,27 @@
   # CSP general (espejo de vercel.json). Ajusta dominios si cambia el backend.
   Header always set Content-Security-Policy "default-src 'self'; connect-src 'self' https://api.gestekeventost.dpdns.org https://*.supabase.co wss://*.supabase.co https://api.mercadopago.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.mercadopago.com https://sdk.mercadopago.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; frame-src 'self' https://www.mercadopago.com https://challenges.cloudflare.com https://www.google.com https://www.youtube.com https://player.vimeo.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
 
-  # eFrame: las rutas /embed/* SÍ se pueden incrustar en cualquier web.
-  <If "%{REQUEST_URI} =~ m#^/embed/#">
+  # eFrame: estas rutas SÍ se pueden incrustar en cualquier web (es el punto).
+  # Espejo de public/_headers y vercel.json — a los tres hay que tocarlos
+  # juntos, y cada uno con SU propia CSP: /embed/* es la versión recortada
+  # (sin Mercado Pago ni Cloudflare, que ahí no hacen falta) y /explorar/* es
+  # la página pública completa, con el mismo CSP que el general.
+  #
+  # Se mira THE_REQUEST y NO REQUEST_URI. La RewriteRule de arriba manda toda
+  # ruta de la SPA a index.html por una redirección interna, y cuando Apache
+  # evalúa estos <If> REQUEST_URI ya vale "/index.html": no coincidía nunca, y
+  # hasta /embed/ salía con frame-ancestors 'self' en producción. THE_REQUEST
+  # es la línea original ("GET /embed/x?fid=… HTTP/1.1") y no la toca nadie.
+  <If "%{THE_REQUEST} =~ m#^\S+\s/embed/#">
     Header always set Content-Security-Policy "default-src 'self'; connect-src 'self' https://api.gestekeventost.dpdns.org https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; frame-src 'self' https://www.google.com https://www.youtube.com https://player.vimeo.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *;"
+  </If>
+
+  # Faltaba esta: quien sirve desde cPanel (este archivo) y no desde Vercel
+  # se encontraba la página pública del evento (con el registro y la compra
+  # de boletas) bloqueada por 'frame-ancestors self' al incrustarla en la web
+  # del organizador, aunque public/_headers y vercel.json ya la permitían.
+  <If "%{THE_REQUEST} =~ m#^\S+\s/explorar/#">
+    Header always set Content-Security-Policy "default-src 'self'; connect-src 'self' https://api.gestekeventost.dpdns.org https://*.supabase.co wss://*.supabase.co https://api.mercadopago.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.mercadopago.com https://sdk.mercadopago.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; frame-src 'self' https://www.mercadopago.com https://challenges.cloudflare.com https://www.google.com https://www.youtube.com https://player.vimeo.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *;"
   </If>
 </IfModule>
 
