@@ -1,5 +1,5 @@
 import { QRCodeSVG } from 'qrcode.react';
-import { ETIQUETA_DEFECTO, ALTURAS_MM, medidas, normalizarEtiqueta } from '../../lib/etiquetaTermica.js';
+import { ETIQUETA_DEFECTO, ALTURAS_MM, medidas, normalizarEtiqueta, correoDe, tamCodigoMm } from '../../lib/etiquetaTermica.js';
 
 /* Una escarapela para la etiquetadora térmica, a tamaño real.
  *
@@ -26,11 +26,7 @@ import { ETIQUETA_DEFECTO, ALTURAS_MM, medidas, normalizarEtiqueta } from '../..
 
 export default function EtiquetaTermica({
   ticket = {},
-  evento = {},
   qrValue,
-  /* Tipos que van con el recuadro relleno (VIP, Staff…). Es lo más parecido a
-     «este es distinto» que se puede imprimir en un bit. */
-  destacados = [],
   logoUrl = '',
   mostrarCodigo = true,
   /* Las medidas del rollo que el organizador tenga. Sin esto, las de siempre. */
@@ -41,8 +37,7 @@ export default function EtiquetaTermica({
   const m = medidas(valor, E);
 
   const nombre = (ticket.asistente?.nombre || ticket.guest_nombre || '').trim();
-  const tipo = (ticket.tipo?.nombre || '').trim();
-  const destacado = destacados.some(d => d.toLowerCase() === tipo.toLowerCase());
+  const correo = correoDe(ticket);
 
   if (!m.cabe) {
     return (
@@ -122,18 +117,6 @@ export default function EtiquetaTermica({
           includeMargin
           style={{ width: `${m.lado_mm}mm`, height: `${m.lado_mm}mm`, display: 'block' }}
         />
-        {mostrarCodigo && ticket.codigo && (
-          <span style={{
-            fontFamily: 'Courier, monospace',
-            fontSize: `${ALTURAS_MM.codigo}mm`,
-            letterSpacing: '0.4mm',
-            fontWeight: 700,
-            marginTop: '0.5mm',
-            lineHeight: 1,
-          }}>
-            {ticket.codigo}
-          </span>
-        )}
       </div>
 
       <div style={{
@@ -164,29 +147,29 @@ export default function EtiquetaTermica({
           {nombre || 'Sin nombre'}
         </p>
 
-        {tipo && (
-          <span style={{
-            alignSelf: 'flex-start',
-            fontSize: `${ALTURAS_MM.tipo}mm`,
-            fontWeight: 700,
-            textTransform: 'uppercase',
+        {mostrarCodigo && ticket.codigo && (
+          <p style={{
+            fontFamily: 'Courier, monospace',
+            fontSize: `${tamCodigoMm(ticket.codigo, anchoTexto)}mm`,
             letterSpacing: '0.3mm',
+            fontWeight: 700,
             lineHeight: 1,
-            padding: '1mm 1.5mm',
-            border: '0.375mm solid #000',   // 3 puntos: por debajo se pierde
-            ...(destacado ? { background: '#000', color: '#fff' } : {}),
+            margin: 0,
+            whiteSpace: 'nowrap',
           }}>
-            {tipo}
-          </span>
+            {ticket.codigo}
+          </p>
         )}
 
-        <p style={{
-          fontSize: `${ALTURAS_MM.evento}mm`,
-          margin: 0, lineHeight: 1.15,
-          display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
-        }}>
-          {evento.titulo || ''}
-        </p>
+        {correo && (
+          <p style={{
+            fontSize: `${ALTURAS_MM.correo}mm`,
+            margin: 0, lineHeight: 1.15, wordBreak: 'break-all',
+            display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden',
+          }}>
+            {correo}
+          </p>
+        )}
       </div>
       </>
       )}

@@ -268,10 +268,27 @@ export function medidas(token = '', etiqueta) {
  * 2 mm las letras empiezan a rellenarse y una «e» se convierte en un borrón. */
 export const ALTURAS_MM = {
   nombre: 6,      // se lee de pie, a metro y medio
-  tipo: 3,
-  evento: 2.5,
-  codigo: 3.5,    // monoespaciada: es lo que se teclea cuando el QR no lee
+  /* El código se teclea en la puerta cuando el QR no lee, y se pidió de 6 mm
+     como mínimo. A ese tamaño ya no cabe bajo el QR: va en la columna de texto,
+     debajo del nombre. Sólo baja de 6 si la columna es más estrecha que el
+     código, para que no se corte. */
+  codigo: 6,
+  correo: 2.5,
 };
+
+/* La etiqueta lleva nombre, código y correo. El tipo de boleta y el nombre del
+   evento se quitaron a pedido: en la puerta no se miran, y el correo sí sirve
+   para confirmar a quién se le entrega. */
+export const correoDe = (ticket = {}) =>
+  (ticket.guest_email || ticket.usuario?.email || ticket.asistente?.email || '').trim();
+
+/* Alto de letra del código que cabe en `anchoMm`. Courier mide 0,6 de ancho
+   por carácter, más el espaciado. */
+export function tamCodigoMm(codigo, anchoMm) {
+  const n = String(codigo || '').length || 1;
+  const cabe = anchoMm / (n * 0.6 + n * 0.05);
+  return Math.max(2.5, Math.min(ALTURAS_MM.codigo, cabe));
+}
 
 /* De milímetros a puntos, redondeando al punto entero: si no, el cabezal
    redondea por su cuenta y el resultado no es el que se midió. */

@@ -55,7 +55,6 @@ export default function EtiquetadoraSection({ evento }) {
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('');
   const [sel, setSel] = useState(new Set());
-  const [destacados, setDestacados] = useState([]);
 
   const cfg = useMemo(
     () => impresionConfig(evento.page_json, { publico: 'asistentes' }) || {},
@@ -73,11 +72,6 @@ export default function EtiquetadoraSection({ evento }) {
     const t = `${c.guest_nombre || c.usuario?.nombre || ''} ${c.tipo?.nombre || ''}`.toLowerCase();
     return t.includes(filtro.toLowerCase());
   }), [clientes, filtro]);
-
-  const tipos = useMemo(
-    () => [...new Set(clientes.map(c => c.tipo?.nombre).filter(Boolean))],
-    [clientes],
-  );
 
   const etq = piezas.find(x => x.id === piezaId) || piezas[0];
 
@@ -128,28 +122,17 @@ export default function EtiquetadoraSection({ evento }) {
    * saber si el DISEÑO está bien —separado del problema del driver— es
    * imprimir esta imagen desde el Visor de fotos de Windows, a tamaño real.
    * Si ahí sale limpia, el diseño no tiene nada que arreglar. */
-  /* `sencilla`: QR, código, nombre y correo — sin el rol ni el nombre del
-   * evento. Es la que se pidió para imprimir a mano desde cualquier programa:
-   * una imagen que no hay que configurar. El generador omite el chip del tipo
-   * cuando no hay tipo, y la línea pequeña de debajo del nombre —la del
-   * evento— se reutiliza para el correo. */
-  const descargarVistaPrevia = async (sencilla = false) => {
+  const descargarVistaPrevia = async () => {
     setGenerandoPng(true);
     try {
-      const base = aImprimir[0] || { guest_nombre: 'María Restrepo', guest_email: 'maria@correo.com', codigo: 'ABC123' };
-      const correo = base.guest_email || base.usuario?.email || base.asistente?.email || '';
-      const ticket = sencilla ? { ...base, tipo: null } : base;
+      const ticket = aImprimir[0] || { guest_nombre: 'María Restrepo', guest_email: 'maria@correo.com', codigo: 'ABC123' };
       const ok = await descargarEtiquetaPng({
         etiqueta: etq,
         ticket,
-        evento: sencilla ? { titulo: correo } : evento,
         qrValue: valorQr(etq, ticket),
-        destacados: sencilla ? [] : destacados,
         logoUrl: cfg.logo_url || '',
         mostrarCodigo: cfg.mostrar?.codigo !== false,
-      }, sencilla
-        ? `escarapela-${String(base.codigo || 'muestra').replace(/[^\w.-]+/g, '-').slice(0, 60)}`
-        : `${etq.nombre}-vista-previa`);
+      }, `escarapela-${String(ticket.codigo || 'muestra').replace(/[^\w.-]+/g, '-').slice(0, 60)}`);
       if (!ok) toastErr('No se pudo generar el PNG con estas medidas.');
     } catch (e) { toastErr(e.message); }
     finally { setGenerandoPng(false); }
@@ -191,9 +174,7 @@ export default function EtiquetadoraSection({ evento }) {
       const generadas = await imprimirComoPng({
         etiqueta: etq,
         tickets: aImprimir,
-        evento,
         qrDe: (t) => valorQr(etq, t),
-        destacados,
         logoUrl: cfg.logo_url || '',
         mostrarCodigo: cfg.mostrar?.codigo !== false,
       });
@@ -392,25 +373,6 @@ export default function EtiquetadoraSection({ evento }) {
             </div>
           </div>
 
-          {tipos.length > 0 && (
-            <div>
-              <label className="label">Tipos que van con el recuadro relleno</label>
-              <div className="flex flex-wrap gap-2">
-                {tipos.map(t => (
-                  <button key={t}
-                    onClick={() => setDestacados(d => d.includes(t) ? d.filter(x => x !== t) : [...d, t])}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors
-                      ${destacados.includes(t) ? 'border-accent bg-accent/10 text-text-1' : 'border-border text-text-3 hover:text-text-1'}`}>
-                    {t}
-                  </button>
-                ))}
-              </div>
-              <p className="text-[11px] text-text-3 mt-1">
-                En térmica no hay colores: destacar un tipo es invertir su recuadro. Si de
-                verdad hacen falta dos, se cambia la cinta y se imprimen en dos tandas.
-              </p>
-            </div>
-          )}
         </div>
       </div>
 
@@ -422,22 +384,17 @@ export default function EtiquetadoraSection({ evento }) {
             <button onClick={descargarQrSuelto} disabled={!!problema} className="btn-ghost btn-sm">
               Descargar QR
             </button>
-            <button onClick={() => descargarVistaPrevia(true)} disabled={generandoPng || !!problema} className="btn-ghost btn-sm"
-              title="La escarapela como imagen con QR, código, nombre y correo: sin rol ni nombre del evento. Para imprimirla desde cualquier programa.">
+            <button onClick={descargarVistaPrevia} disabled={generandoPng || !!problema} className="btn-ghost btn-sm"
+              title="La escarapela como imagen —QR, nombre, código y correo— para imprimirla desde cualquier programa.">
               {generandoPng ? 'Generando…' : 'Descargar escarapela (imagen)'}
-            </button>
-            <button onClick={() => descargarVistaPrevia(false)} disabled={generandoPng || !!problema} className="btn-ghost btn-sm">
-              {generandoPng ? 'Generando…' : 'Descargar PNG'}
             </button>
           </div>
         </div>
         <div className="inline-block bg-white rounded-xl p-2 ring-1 ring-black/10">
           <EtiquetaTermica
             etiqueta={etq}
-            ticket={aImprimir[0] || { guest_nombre: 'María Restrepo', codigo: 'ABC123' }}
+            ticket={aImprimir[0] || { guest_nombre: 'María Restrepo', guest_email: 'maria@correo.com', codigo: 'ABC123' }}
             qrValue={valorQr(etq, aImprimir[0] || { codigo: 'ABC123' })}
-            evento={evento}
-            destacados={destacados}
             logoUrl={cfg.logo_url || ''}
             mostrarCodigo={cfg.mostrar?.codigo !== false}
           />
@@ -493,8 +450,6 @@ export default function EtiquetadoraSection({ evento }) {
           etiqueta={etq}
           qrDe={(t) => valorQr(etq, t)}
           tickets={aImprimir}
-          evento={evento}
-          destacados={destacados}
           logoUrl={cfg.logo_url || ''}
           mostrarCodigo={cfg.mostrar?.codigo !== false}
         />

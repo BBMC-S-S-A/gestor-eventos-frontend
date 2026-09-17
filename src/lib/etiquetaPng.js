@@ -1,6 +1,6 @@
 import { qrPng } from './qrPng.jsx';
 import {
-  ETIQUETA_DEFECTO, ALTURAS_MM, PUNTOS_POR_MM, medidas, normalizarEtiqueta,
+  ETIQUETA_DEFECTO, ALTURAS_MM, PUNTOS_POR_MM, medidas, normalizarEtiqueta, correoDe, tamCodigoMm,
 } from './etiquetaTermica.js';
 
 /* La escarapela térmica, dibujada a mano en un <canvas> — igual que
@@ -109,8 +109,8 @@ function envolverTexto(ctx, texto, maxAnchoPx, maxLineas) {
  * ya impide imprimir desde `EtiquetaTermica.jsx` — para que quien llama avise
  * en vez de descargar una etiqueta a medias. */
 export async function etiquetaPng({
-  etiqueta, ticket = {}, evento = {}, qrValue: qrPedido = null,
-  destacados = [], logoUrl = '', mostrarCodigo = true,
+  etiqueta, ticket = {}, qrValue: qrPedido = null,
+  logoUrl = '', mostrarCodigo = true,
 }, escala = 1) {
   const E = etiqueta ? normalizarEtiqueta(etiqueta) : ETIQUETA_DEFECTO;
   const valor = qrPedido || ticket.qr_token || ticket.codigo || '';
@@ -138,9 +138,7 @@ export async function etiquetaPng({
   const margen = mm(E.margen);
   const gap = mm(1.5);
   const nombre = (ticket.asistente?.nombre || ticket.guest_nombre || '').trim();
-  const tipo = (ticket.tipo?.nombre || '').trim();
-  const destacado = destacados.some((d) => d.toLowerCase() === tipo.toLowerCase());
-  const tituloEvento = evento.titulo || '';
+  const correo = correoDe(ticket);
 
   if (E.formato_codigo === 'serial') {
     /* Nombre arriba, serial grande debajo, centrados — igual que el modo
@@ -196,34 +194,28 @@ export async function etiquetaPng({
         ctx.drawImage(qrImg, qrX + offset, qrY + offset, ladoPx, ladoPx);
       }
     }
-    if (mostrarCodigo && ticket.codigo) {
-      const tamCodigo = mm(ALTURAS_MM.codigo);
-      ctx.font = `700 ${tamCodigo}px Courier, monospace`;
-      ctx.textAlign = 'center';
-      ctx.fillText(ticket.codigo, qrX + cajaPx / 2, qrY + cajaPx + tamCodigo * 0.9);
-    }
 
-    /* El bloque de texto (logo + nombre + tipo + evento), centrado dentro
+    /* El bloque de texto (logo + nombre + código + correo), centrado dentro
        del alto/ancho que le queda — el mismo `justify-content:center` que
        en pantalla. Se mide primero para saber cuánto ocupa entero. */
     const tamNombre = mm(ALTURAS_MM.nombre);
     ctx.font = `800 ${tamNombre}px Helvetica, Arial, sans-serif`;
     const lineasNombre = envolverTexto(ctx, nombre || 'Sin nombre', textoAnchoPx, 2);
 
-    const tamTipo = mm(ALTURAS_MM.tipo);
-    const chipAlto = tipo ? tamTipo + mm(2) : 0;
+    const codigo = mostrarCodigo ? (ticket.codigo || '') : '';
+    const tamCodigo = codigo ? mm(tamCodigoMm(codigo, textoAnchoPx / pxPorMm)) : 0;
 
-    const tamEventoTxt = mm(ALTURAS_MM.evento);
-    ctx.font = `400 ${tamEventoTxt}px Helvetica, Arial, sans-serif`;
-    const lineasEvento = tituloEvento ? envolverTexto(ctx, tituloEvento, textoAnchoPx, 2) : [];
+    const tamCorreo = mm(ALTURAS_MM.correo);
+    ctx.font = `400 ${tamCorreo}px Helvetica, Arial, sans-serif`;
+    const lineasCorreo = correo ? envolverTexto(ctx, correo, textoAnchoPx, 2) : [];
 
     const logo = logoUrl ? await cargarImagen(logoUrl) : null;
     const ladoLogo = logo ? mm(5) : 0;
 
     const altoBloque = (ladoLogo ? ladoLogo + gap : 0)
       + lineasNombre.length * tamNombre * 1.05 + gap
-      + (tipo ? chipAlto + gap : 0)
-      + lineasEvento.length * tamEventoTxt * 1.15;
+      + (codigo ? tamCodigo + gap : 0)
+      + lineasCorreo.length * tamCorreo * 1.15;
 
     let y = textoY + Math.max(0, (textoAltoPx - altoBloque) / 2);
 
@@ -250,38 +242,19 @@ export async function etiquetaPng({
     }
     y += gap;
 
-    if (tipo) {
-      ctx.font = `bold ${tamTipo}px Helvetica, Arial, sans-serif`;
-      const padX = mm(1.5);
-      const anchoTexto = ctx.measureText(tipo.toUpperCase()).width;
-      const anchoChip = anchoTexto + padX * 2;
-      const chipX = alLado ? textoX : tx - anchoChip / 2;
-
-      if (destacado) {
-        ctx.fillStyle = '#000';
-        ctx.fillRect(chipX, y, anchoChip, chipAlto);
-        ctx.fillStyle = '#fff';
-      } else {
-        ctx.lineWidth = mm(0.375);
-        ctx.strokeStyle = '#000';
-        ctx.strokeRect(chipX, y, anchoChip, chipAlto);
-        ctx.fillStyle = '#000';
-      }
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'middle';
-      ctx.fillText(tipo.toUpperCase(), chipX + padX, y + chipAlto / 2);
-      ctx.textBaseline = 'alphabetic';
-      ctx.fillStyle = '#000';
-      y += chipAlto + gap;
+    if (codigo) {
+      ctx.font = `700 ${tamCodigo}px Courier, monospace`;
+      y += tamCodigo * 0.85;
+      ctx.fillText(codigo, tx, y);
+      y += tamCodigo * 0.15 + gap;
     }
 
-    if (lineasEvento.length) {
-      ctx.textAlign = textoAlineado;
-      ctx.font = `400 ${tamEventoTxt}px Helvetica, Arial, sans-serif`;
-      for (const linea of lineasEvento) {
-        y += tamEventoTxt * 0.9;
+    if (lineasCorreo.length) {
+      ctx.font = `400 ${tamCorreo}px Helvetica, Arial, sans-serif`;
+      for (const linea of lineasCorreo) {
+        y += tamCorreo * 0.9;
         ctx.fillText(linea, tx, y);
-        y += tamEventoTxt * 0.25;
+        y += tamCorreo * 0.25;
       }
     }
   }
@@ -313,13 +286,13 @@ export async function descargarEtiquetaPng(datos, nombre = 'etiqueta', escala = 
  * Devuelve cuántas boletas SÍ se pudieron generar, para que quien llama avise
  * si alguna se quedó fuera (el QR no cabía). */
 export async function imprimirComoPng({
-  etiqueta, tickets = [], evento = {}, qrDe, destacados = [], logoUrl = '', mostrarCodigo = true,
+  etiqueta, tickets = [], qrDe, logoUrl = '', mostrarCodigo = true,
 }) {
   const pngs = [];
   for (const t of tickets) {
     // eslint-disable-next-line no-await-in-loop -- cada canvas se libera antes del siguiente; en paralelo se dispara media impresión de tarjetas a la vez.
     const png = await etiquetaPng({
-      etiqueta, ticket: t, evento, destacados, logoUrl, mostrarCodigo,
+      etiqueta, ticket: t, logoUrl, mostrarCodigo,
       qrValue: qrDe ? qrDe(t) : (t.qr_token || t.codigo),
     });
     if (png) pngs.push(png);
