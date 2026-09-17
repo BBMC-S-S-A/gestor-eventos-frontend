@@ -28,6 +28,8 @@ import { useSondeo } from './useSondeo.js';
 export function useAsistenciaEnVivo(eventoId, { cadaMs = 12000 } = {}) {
   const [ingresados, setIngresados] = useState(null); // null = cargando
   const [total, setTotal] = useState(null);
+  /* Si el servidor ya dijo que no, se deja de preguntar. Ver abajo. */
+  const [permitido, setPermitido] = useState(true);
 
   const refrescar = useCallback(async () => {
     if (!eventoId) return;
@@ -35,12 +37,26 @@ export function useAsistenciaEnVivo(eventoId, { cadaMs = 12000 } = {}) {
       const d = await clientesApi.list(eventoId, { limit: 1 });
       setIngresados(d.stats?.usado || 0);
       setTotal(d.stats?.total || 0);
-    } catch { /* silencioso: no rompemos la pantalla si falla */ }
+    } catch (e) {
+      /* Un 403 no es un fallo pasajero: es la respuesta correcta para quien no
+         tiene `ver_clientes` en este evento —la lista de asistentes son datos
+         personales— y va a seguir siéndolo. Reintentarlo cada doce segundos no
+         lo va a cambiar; sólo llena la consola de rojo cada doce segundos y
+         hace pensar que la API está fallando. Pasó de verdad: se reportó como
+         "llamadas que terminan en error contra la API cada cierto tiempo".
+
+         Con el resto de errores —red, 500, timeout— sí se sigue sondeando,
+         porque esos sí se arreglan solos. */
+      if (e?.response?.status === 403) setPermitido(false);
+      /* Silencioso igual: el contador se queda sin número, pero la pantalla
+         entera no se cae por un recuadro. */
+    }
   }, [eventoId]);
 
-  /* Primer tiro inmediato + sondeo mientras la pestaña esté visible. */
-  useEffect(() => { refrescar(); }, [refrescar]);
-  useSondeo(refrescar, cadaMs, Boolean(eventoId));
+  /* Primer tiro inmediato + sondeo mientras la pestaña esté visible. Al cambiar
+     de evento se vuelve a permitir: el permiso es por evento, no por persona. */
+  useEffect(() => { setPermitido(true); refrescar(); }, [refrescar]);
+  useSondeo(refrescar, cadaMs, Boolean(eventoId) && permitido);
 
   /* Bump optimista: refleja el propio escaneo al instante. El sondeo luego
      confirma/corrige el número real. */
