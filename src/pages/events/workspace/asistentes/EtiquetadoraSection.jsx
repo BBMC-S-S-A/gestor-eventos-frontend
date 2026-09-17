@@ -11,6 +11,7 @@ import { eventosApi } from '../../../../api/eventos.js';
 import { useToast } from '../../../../context/ToastContext.jsx';
 import MedirConFoto from './MedirConFoto.jsx';
 import { impresionConfig } from '../../../../lib/wallet.js';
+import { descargarEtiquetaPng, imprimirComoPng } from '../../../../lib/etiquetaPng.js';
 
 /* Asistentes · Imprimir en etiquetadora.
  *
@@ -48,6 +49,8 @@ export default function EtiquetadoraSection({ evento }) {
   const sinGuardar = JSON.stringify(piezas) !== guardado;
   const [guardando, setGuardando] = useState(false);
   const [midiendo, setMidiendo] = useState(false);
+  const [generandoPng, setGenerandoPng] = useState(false);
+  const [imprimiendoPng, setImprimiendoPng] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('');
   const [sel, setSel] = useState(new Set());
@@ -115,6 +118,58 @@ export default function EtiquetadoraSection({ evento }) {
   const toggle = (id) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const todos = () => setSel(s => s.size === filas.length ? new Set() : new Set(filas.map(f => f.id)));
   const aImprimir = filas.filter(f => sel.size === 0 || sel.has(f.id));
+
+  /* Baja la vista previa como PNG, a la resolución exacta de la impresora.
+   *
+   * Para esto existe: cuando el driver de la etiquetadora reescala lo que
+   * manda `window.print()` (pasa con el Seagull/BarTender de la SAT TT460
+   * si su tamaño de página no coincide con el del navegador), la forma de
+   * saber si el DISEÑO está bien —separado del problema del driver— es
+   * imprimir esta imagen desde el Visor de fotos de Windows, a tamaño real.
+   * Si ahí sale limpia, el diseño no tiene nada que arreglar. */
+  const descargarVistaPrevia = async () => {
+    setGenerandoPng(true);
+    try {
+      const ticket = aImprimir[0] || { guest_nombre: 'María Restrepo', codigo: 'ABC123' };
+      const ok = await descargarEtiquetaPng({
+        etiqueta: etq,
+        ticket,
+        evento,
+        qrValue: valorQr(etq, ticket),
+        destacados,
+        logoUrl: cfg.logo_url || '',
+        mostrarCodigo: cfg.mostrar?.codigo !== false,
+      }, `${etq.nombre}-vista-previa`);
+      if (!ok) toastErr('No se pudo generar el PNG con estas medidas.');
+    } catch (e) { toastErr(e.message); }
+    finally { setGenerandoPng(false); }
+  };
+
+  /* La alternativa a `window.print()` de más abajo: en vez de mandar el HTML
+   * de la escarapela y confiar en que el driver la ponga en el papel tal
+   * cual, se genera un PNG por boleta —a 8 px/mm, que a 203 dpi es un punto
+   * del cabezal por píxel— y se manda a imprimir esa imagen. Ver
+   * `lib/etiquetaPng.js` para el porqué completo. */
+  const imprimirPorPng = async () => {
+    setImprimiendoPng(true);
+    try {
+      const generadas = await imprimirComoPng({
+        etiqueta: etq,
+        tickets: aImprimir,
+        evento,
+        qrDe: (t) => valorQr(etq, t),
+        destacados,
+        logoUrl: cfg.logo_url || '',
+        mostrarCodigo: cfg.mostrar?.codigo !== false,
+      });
+      if (generadas === 0) {
+        toastErr('No se pudo generar ninguna escarapela — revisa que el navegador no haya bloqueado la ventana emergente.');
+      } else if (generadas < aImprimir.length) {
+        toastErr(`Se imprimieron ${generadas} de ${aImprimir.length}: las demás no cabían con estas medidas.`);
+      }
+    } catch (e) { toastErr(e.message); }
+    finally { setImprimiendoPng(false); }
+  };
 
   /* El QR es quien decide si esto se puede imprimir: su tamaño sale del largo
      del token firmado, no del gusto de nadie. Si un token creciera hasta no
@@ -326,7 +381,12 @@ export default function EtiquetadoraSection({ evento }) {
 
       {/* Vista previa a tamaño real: lo que se mira aquí es si el nombre cabe. */}
       <div className="no-print">
-        <p className="text-xs text-text-3 mb-2">Así sale, a tamaño real:</p>
+        <div className="flex items-center justify-between gap-3 flex-wrap mb-2">
+          <p className="text-xs text-text-3">Así sale, a tamaño real:</p>
+          <button onClick={descargarVistaPrevia} disabled={generandoPng || !!problema} className="btn-ghost btn-sm">
+            {generandoPng ? 'Generando…' : 'Descargar PNG'}
+          </button>
+        </div>
         <div className="inline-block bg-white rounded-xl p-2 ring-1 ring-black/10">
           <EtiquetaTermica
             etiqueta={etq}
@@ -338,6 +398,11 @@ export default function EtiquetadoraSection({ evento }) {
             mostrarCodigo={cfg.mostrar?.codigo !== false}
           />
         </div>
+        <p className="text-[11px] text-text-3 mt-1.5 leading-relaxed">
+          Si al imprimir desde GESTEK sale mal (recortado, chico o corrido), bájate este PNG e
+          imprímelo directo desde el visor de fotos: si ahí sale bien, el problema es del driver
+          de la impresora ajustando la página, no del diseño.
+        </p>
       </div>
 
       {clientes.length === 0 ? (
@@ -353,9 +418,15 @@ export default function EtiquetadoraSection({ evento }) {
               {sel.size === filas.length ? 'Quitar selección' : 'Seleccionar todos'}
             </button>
           </div>
-          <button onClick={() => window.print()} disabled={!!problema} className="btn-primary btn-sm">
-            Imprimir {aImprimir.length} etiqueta{aImprimir.length !== 1 ? 's' : ''}
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={imprimirPorPng} disabled={!!problema || imprimiendoPng} className="btn-ghost btn-sm"
+              title="Genera un PNG por escarapela y lo manda a imprimir, en vez de mandar el HTML. Úsalo si el driver de la impresora reescala o corta la impresión normal.">
+              {imprimiendoPng ? 'Generando…' : 'Imprimir por imagen (PNG)'}
+            </button>
+            <button onClick={() => window.print()} disabled={!!problema} className="btn-primary btn-sm">
+              Imprimir {aImprimir.length} etiqueta{aImprimir.length !== 1 ? 's' : ''}
+            </button>
+          </div>
         </div>
 
         {problema && (
