@@ -25,12 +25,12 @@ import path from 'node:path';
 
 const leer = (f) => fs.readFileSync(path.join(process.cwd(), 'src', f), 'utf8').replace(/\r/g, '');
 
-/* Los 32 de `core/permisos/catalogo.js` al 2026-09-13. `entregar` es el
-   último: lo creó la 0126 para repartir lo que la boleta incluye —el almuerzo,
-   el kit, el parqueadero— sin tener que dar el permiso de la puerta. */
+/* Los 33 de `core/permisos/catalogo.js` al 2026-09-17. `gestionar_zonas` es el
+   último: crear zonas y colocarlas en el mapa sin dar la landing ni el evento
+   entero. Antes de él, `entregar` (0126): repartir lo que la boleta incluye. */
 const DEL_SERVIDOR = [
   'editar_evento', 'publicar_evento', 'editar_pagina_publica', 'gestionar_imagenes',
-  'gestionar_agenda', 'gestionar_torneo', 'gestionar_expositores', 'gestionar_accesos',
+  'gestionar_agenda', 'gestionar_torneo', 'gestionar_expositores', 'gestionar_accesos', 'gestionar_zonas',
   'invitar_staff', 'gestionar_roles', 'remover_miembros', 'gestionar_solicitudes',
   'gestionar_tareas', 'ver_documentos', 'gestionar_documentos', 'gestionar_vacantes',
   'gestionar_tickets', 'gestionar_descuentos',

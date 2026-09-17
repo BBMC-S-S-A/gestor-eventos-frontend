@@ -68,6 +68,7 @@ export const PERMISOS = [
   { id: 'gestionar_torneo',      grupo: 'Espacio',   label: 'Gestionar torneos',       desc: 'Equipos, llaves, resultados y categorías.', aplicado: true },
   { id: 'gestionar_expositores', grupo: 'Espacio',   label: 'Gestionar expositores',   desc: 'Stands, fichas y puntos de los expositores.', aplicado: true },
   { id: 'gestionar_accesos',     grupo: 'Espacio',   label: 'Accesos e ingresos',      desc: 'Definir las puertas del evento y qué boletas admite cada una.', aplicado: true },
+  { id: 'gestionar_zonas',       grupo: 'Espacio',   label: 'Zonas y mapa',            desc: 'Crear las zonas del evento, su aforo, y colocarlas en el mapa.', aplicado: true },
 
   /* Equipo */
   { id: 'invitar_staff',         grupo: 'Equipo',    label: 'Invitar al equipo',       desc: 'Agregar nuevas personas como staff.', aplicado: true },
