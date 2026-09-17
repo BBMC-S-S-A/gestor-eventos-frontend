@@ -85,10 +85,24 @@ export default function RuedaPublicaPage() {
         </div>
       ) : (
         <>
+          {/* El texto tiene que decir lo que de verdad se puede hacer AQUÍ.
+            *
+            * Decía siempre «escribe al contacto de la mesa que te interese», y
+            * el contacto sólo se pinta cuando la empresa encendió
+            * `contacto_publico` — que nace apagado a propósito desde la 0105,
+            * porque son datos personales y publicarlos no se deshace.
+            *
+            * Medido en producción: de seis fichas, CERO lo tienen encendido. O
+            * sea que la única instrucción de la página era imposible de seguir
+            * en todas las tarjetas, y quien llegaba se quedaba sin saber a
+            * dónde ir. El valor por defecto es el correcto; lo que estaba mal
+            * era el texto, que prometía algo que ese valor impide. */}
           <p className="text-sm text-text-2 leading-relaxed max-w-2xl">
             Estas son las empresas que reciben, con su mesa y las horas que siguen libres.
-            Para pedir un espacio, escribe al contacto de la mesa que te interese o a quien
-            organiza el evento — desde aquí no se reserva.
+            Desde aquí no se reserva.{' '}
+            {datos.rueda.some(m => m.contacto)
+              ? 'Para pedir un espacio, escribe al contacto de la mesa que te interese; las que no lo muestran, a través de quien organiza el evento.'
+              : 'Para pedir un espacio hay que escribir a quien organiza el evento: estas empresas no han publicado un contacto directo.'}
           </p>
 
           <div className="grid sm:grid-cols-2 gap-4">
@@ -135,12 +149,18 @@ function Mesa({ m }) {
             hay sitio, y esconderlas haría parecer que el día es más corto. */}
         <div className="flex flex-wrap gap-1.5">
           {m.horarios.map(h => (
+            /* Libre u ocupado se decía sólo con el tachado y el color, que es
+               decir nada a quien usa un lector de pantalla: oía las doce horas
+               iguales y se llevaba una lista de huecos que no existen. El
+               `title` lo dice al pasar el ratón; el `sr-only`, en voz alta. */
             <span key={h.id}
+              title={h.libre ? 'Libre' : 'Ocupado'}
               className={`text-[11px] px-2 py-0.5 rounded-full border ${
                 h.libre
                   ? 'border-success/40 bg-success/10 text-text-1'
                   : 'border-border text-text-3 line-through'}`}>
               {new Date(h.inicio).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })}
+              <span className="sr-only">{h.libre ? ' · libre' : ' · ocupado'}</span>
             </span>
           ))}
         </div>

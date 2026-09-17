@@ -1072,11 +1072,30 @@ function AdminView({ evento }) {
   const [horariosPara, setHorariosPara] = useState(null); // expositor seleccionado
   const { success, error: toastErr } = useToast();
 
+  /* Un fallo NO es una lista vacía.
+   *
+   * Esto sólo avisaba con un toast y dejaba `data` en null, y abajo `!data` y
+   * `data.length === 0` pintan lo mismo: «Aún no agregaste expositores». O sea
+   * que cuando la petición fallaba, la pantalla decía con total seguridad que
+   * no había ninguno — y el toast, que era el único indicio, se desvanece a los
+   * segundos. Medido: un evento con una empresa dada de alta, activa y con la
+   * ficha completa, enseñando el cartel de «todavía no hay ninguna».
+   *
+   * El servidor se cuida de no tragarse estos errores —lo dice en sus propios
+   * comentarios: «una agenda llena que se ve vacía es peor que un error»— y
+   * aquí se tiraba ese cuidado en la última línea. */
+  const [fallo, setFallo] = useState(null);
+
   const cargar = () => {
     setLoading(true);
+    setFallo(null);
     networkingApi.admin(evento.id)
       .then(d => setData(d.expositores || []))
-      .catch(e => toastErr(e.response?.data?.error || e.message))
+      .catch(e => {
+        const msg = e.response?.data?.error || e.message;
+        setFallo(msg);
+        toastErr(msg);
+      })
       .finally(() => setLoading(false));
   };
   useEffect(() => { cargar(); /* eslint-disable-next-line */ }, [evento.id]);
@@ -1113,7 +1132,16 @@ function AdminView({ evento }) {
         <button onClick={() => setEditando('nuevo')} className="btn-gradient btn-sm">+ Agregar expositor</button>
       </div>
 
-      {(!data || data.length === 0) ? (
+      {fallo ? (
+        /* Se dice que falló, y se ofrece reintentar. Lo que no se puede es
+           enseñar el cartel de «no hay ninguno»: puede haberlos todos. */
+        <div className="rounded-3xl border border-danger/40 bg-danger/5 px-6 py-12 text-center space-y-3">
+          <p className="text-sm text-text-1">No se pudo cargar la lista de expositores.</p>
+          <p className="text-xs text-text-3 break-words">{fallo}</p>
+          <p className="text-xs text-text-3">Puede haber empresas dadas de alta que no se están viendo.</p>
+          <button onClick={cargar} className="btn-secondary btn-sm">Reintentar</button>
+        </div>
+      ) : (!data || data.length === 0) ? (
         <div className="rounded-3xl border border-border bg-surface/40 px-6 py-16 text-center">
           <p className="text-sm text-text-3">Aún no agregaste expositores. Crea el primero para empezar.</p>
         </div>
