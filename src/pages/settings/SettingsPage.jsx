@@ -11,6 +11,7 @@ import { usePush } from '../../hooks/usePush.js';
 import { guardarBrandingLocal } from '../../hooks/useBranding.js';
 import { auth } from '../../lib/sesion.js';
 import { PAISES, bandera } from '../../lib/paises.js';
+import { API } from '../../lib/apiUrl.js';
 
 /* Pagos, Notificaciones y Recompensas viven ahora como secciones
    propias en el sidebar (páginas dedicadas). */
@@ -530,7 +531,7 @@ function IntegracionesTab() {
      intentó. */
   const [envios, setEnvios]         = useState({});
 
-  const apiBase = (import.meta.env.VITE_API_URL || 'http://localhost:3000');
+  const apiBase = API;
 
   const cargar = async () => {
     setLoading(true);

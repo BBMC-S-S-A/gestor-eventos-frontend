@@ -1,4 +1,4 @@
-/* Cliente de la identidad propia, con la MISMA forma que `supabase.auth`.
+import { API } from './apiUrl.js';/* Cliente de la identidad propia, con la MISMA forma que `supabase.auth`.
  *
  * ── Por qué imita la interfaz de Supabase ─────────────────────────────────
  *
@@ -26,7 +26,7 @@
  * Supabase, cerrar sesión en un dispositivo perdido no era posible.
  */
 
-const BASE = (import.meta.env.VITE_API_URL || 'http://localhost:3000').replace(/\/$/, '');
+const BASE = API;
 const LLAVE = 'gestek.sesion';
 
 /* ── Guardado ─────────────────────────────────────────────────────────── */

@@ -1,7 +1,10 @@
 import axios from 'axios';
 import { auth } from '../lib/sesion.js';
+import { API } from '../lib/apiUrl.js';
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+/* Una sola respuesta a «¿dónde está la API?». Ver `lib/apiUrl.js`: esto se
+   leía en cinco archivos con cuatro planes B distintos. */
+const BASE_URL = API;
 
 const client = axios.create({
   baseURL: BASE_URL,

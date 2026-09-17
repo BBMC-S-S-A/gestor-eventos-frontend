@@ -31,7 +31,7 @@ picos — la apertura de registros y el recordatorio masivo.
 | Repo | Dónde vive | Producción |
 |---|---|---|
 | `gestor-eventos-frontend` | React + Vite | Vercel → https://gestekeventost.dpdns.org |
-| `gestor-eventos-backend` | Express | Render → https://gestor-eventos-backend-yx75.onrender.com |
+| `gestor-eventos-backend` | Express | cPanel → https://api.gestekeventost.dpdns.org |
 
 La base es **Supabase** (`yopontbwgdybfsniqawz`, **plan free**), Postgres 17.
 
@@ -54,8 +54,8 @@ La base es **Supabase** (`yopontbwgdybfsniqawz`, **plan free**), Postgres 17.
 ## 2 · El riesgo número uno
 
 > **Corregido el 14 de agosto por la tarde.** Este documento decía que no había
-> proveedor de correo configurado. Era falso: **Resend está puesto en Render
-> desde hace tiempo.** El diagnóstico correcto es peor y mejor a la vez.
+> proveedor de correo configurado. Era falso: **Resend lleva puesto desde hace
+> tiempo** (entonces en Render; hoy en cPanel). El diagnóstico correcto es peor y mejor a la vez.
 
 Durante toda la vida del proyecto, el correo automático **no fallaba: se
 evaporaba**. Cero filas en la tabla de envíos con 34 boletas emitidas, y ningún
@@ -367,7 +367,7 @@ No necesita `SMTP_CRYPTO_KEY`. En **Claude → Configuración → Conectores →
 Añadir conector personalizado**:
 
 ```
-https://gestor-eventos-backend-yx75.onrender.com/mcp
+https://api.gestekeventost.dpdns.org/mcp
 ```
 
 Claude descubre el OAuth solo, se registra, trae al organizador a la pantalla
