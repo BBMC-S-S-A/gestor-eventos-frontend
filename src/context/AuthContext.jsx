@@ -24,7 +24,7 @@ const DEV_USER = {
   raw: { user_metadata: {}, last_sign_in_at: new Date().toISOString() },
 };
 
-const API_URL = (import.meta.env.VITE_API_URL || 'https://gestor-eventos-backend-yx75.onrender.com').replace(/\/$/, '');
+const API_URL = (import.meta.env.VITE_API_URL || 'https://api.gestekeventost.dpdns.org').replace(/\/$/, '');
 
 /* Convierte un user de Supabase + metadata en el shape que usa el resto de la app.
    Incluye los nombres de campo que envía Google OAuth (full_name, name, picture, avatar_url). */
