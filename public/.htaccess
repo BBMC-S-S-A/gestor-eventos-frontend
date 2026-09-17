@@ -16,9 +16,21 @@
   # CSP general (espejo de vercel.json). Ajusta dominios si cambia el backend.
   Header always set Content-Security-Policy "default-src 'self'; connect-src 'self' https://api.gestekeventost.dpdns.org https://*.supabase.co wss://*.supabase.co https://api.mercadopago.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.mercadopago.com https://sdk.mercadopago.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; frame-src 'self' https://www.mercadopago.com https://challenges.cloudflare.com https://www.google.com https://www.youtube.com https://player.vimeo.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'self';"
 
-  # eFrame: las rutas /embed/* SÍ se pueden incrustar en cualquier web.
+  # eFrame: estas rutas SÍ se pueden incrustar en cualquier web (es el punto).
+  # Espejo de public/_headers y vercel.json — a los tres hay que tocarlos
+  # juntos, y cada uno con SU propia CSP: /embed/* es la versión recortada
+  # (sin Mercado Pago ni Cloudflare, que ahí no hacen falta) y /explorar/* es
+  # la página pública completa, con el mismo CSP que el general.
   <If "%{REQUEST_URI} =~ m#^/embed/#">
     Header always set Content-Security-Policy "default-src 'self'; connect-src 'self' https://api.gestekeventost.dpdns.org https://*.supabase.co wss://*.supabase.co; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; frame-src 'self' https://www.google.com https://www.youtube.com https://player.vimeo.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *;"
+  </If>
+
+  # Faltaba esta: quien sirve desde cPanel (este archivo) y no desde Vercel
+  # se encontraba la página pública del evento (con el registro y la compra
+  # de boletas) bloqueada por 'frame-ancestors self' al incrustarla en la web
+  # del organizador, aunque public/_headers y vercel.json ya la permitían.
+  <If "%{REQUEST_URI} =~ m#^/explorar/#">
+    Header always set Content-Security-Policy "default-src 'self'; connect-src 'self' https://api.gestekeventost.dpdns.org https://*.supabase.co wss://*.supabase.co https://api.mercadopago.com; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://www.mercadopago.com https://sdk.mercadopago.com https://challenges.cloudflare.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: blob: https:; font-src 'self' https://fonts.gstatic.com data:; frame-src 'self' https://www.mercadopago.com https://challenges.cloudflare.com https://www.google.com https://www.youtube.com https://player.vimeo.com; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors *;"
   </If>
 </IfModule>
 
