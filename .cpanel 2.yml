@@ -1,0 +1,20 @@
+---
+# Despliegue en cPanel (Git Version Control → "Deploy HEAD Commit").
+# Construye el frontend (Vite) y copia el resultado a la carpeta pública.
+#
+# ⚠️ REVISA ESTO ANTES DE DESPLEGAR:
+#   DEPLOYPATH = carpeta pública de tu dominio en cPanel.
+#     · Dominio principal:  /home/TU_USUARIO/public_html
+#     · Subdominio/addon:   /home/TU_USUARIO/nombre.tudominio.com
+#   $HOME ya apunta a /home/TU_USUARIO, así que normalmente solo cambia
+#   'public_html' si usas un subdominio.
+#
+#   Si tu cPanel NO tiene Node/npm disponible en el deploy y el build falla,
+#   avísame: pasamos a construir localmente y subir solo el dist/ (plan B).
+deployment:
+  tasks:
+    - export DEPLOYPATH=$HOME/public_html
+    # Build (usa el login shell para tomar node/npm si están vía "Setup Node.js App")
+    - /bin/bash -lc 'npm ci --no-audit --no-fund && npm run build'
+    # Publica: limpia y copia el dist (incluye .htaccess) a la carpeta pública
+    - /bin/bash -lc 'mkdir -p "$DEPLOYPATH" && cp -R dist/. "$DEPLOYPATH"/'
