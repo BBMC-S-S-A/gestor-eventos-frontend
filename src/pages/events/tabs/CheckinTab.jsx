@@ -109,6 +109,23 @@ export default function CheckinTab({ evento, miRolId = null, miUserId = null, pe
   const zonaRef = useRef('');
   const elegirZona = (id) => { setZonaId(id); zonaRef.current = id; };
 
+  /* En qué sentido cuenta este escaneo. `auto` es lo de siempre: el servidor
+     alterna según el último movimiento.
+   *
+   * Existe porque «alterna» y «reingreso» no son lo mismo, y quien está en la
+   * puerta esperaba lo segundo. Quien entró por Check-in queda con la boleta en
+   * `usado`, y sin movimientos previos el servidor lee eso como «está dentro»
+   * (clientes.js:1280) — así que la PRIMERA pulsación de Reingreso sobre esa
+   * persona marca SALIDA. Es coherente con cómo está pensado y es exactamente
+   * lo contrario de lo que dice el botón.
+   *
+   * Con `entrada`/`salida` el sentido lo manda quien está mirando la puerta,
+   * que es quien sabe hacia dónde va la persona. La ruta acepta `tipo` desde
+   * siempre; lo que faltaba era poder mandarlo. */
+  const [sentido, setSentido] = useState('auto');
+  const sentidoRef = useRef('auto');
+  const elegirSentido = (v) => { setSentido(v); sentidoRef.current = v; };
+
   /* Sub-eventos: se piden sólo cuando hace falta (el escáner de la puerta
      principal no los necesita) y se recuerda cuál opera este dispositivo, que
      en un taller es siempre el mismo durante horas. */
@@ -362,7 +379,15 @@ export default function CheckinTab({ evento, miRolId = null, miUserId = null, pe
     setWorking(true);
     setLast(null);
     try {
-      const r = await clientesApi.reingreso(evento.id, { ...payload, acceso_id: puertaRef.current || undefined, zona_id: zonaRef.current || undefined });
+      const r = await clientesApi.reingreso(evento.id, {
+        ...payload,
+        acceso_id: puertaRef.current || undefined,
+        zona_id: zonaRef.current || undefined,
+        /* `auto` no se manda: es la ausencia de `tipo` lo que le dice al
+           servidor que alterne. Mandar la cadena 'auto' sería un tipo que no
+           existe. */
+        tipo: sentidoRef.current === 'auto' ? undefined : sentidoRef.current,
+      });
       /* `aforo` viene con la zona ya recalculada: quien está en la puerta ve el
          número después de ESTE escaneo sin cambiar de pantalla. */
       setLast({ reingresoMode: true, ok: true, dentro: r.dentro, ticket: r.ticket, aforo: r.aforo });
@@ -723,7 +748,29 @@ export default function CheckinTab({ evento, miRolId = null, miUserId = null, pe
 
       {accion === 'reingreso' && (
         <div className="rounded-2xl border border-primary/30 bg-primary/5 px-4 py-2.5 flex flex-wrap items-center justify-between gap-2">
-          <p className="text-xs text-text-2">Modo <b className="text-text-1">reingreso</b>: al escanear se alterna entre <b>salida</b> y <b>entrada</b> sin invalidar la boleta.{zonas.length > 0 ? ' Elige una zona para el aforo por zona.' : ''}</p>
+          <div className="space-y-1.5 min-w-0">
+            <p className="text-xs text-text-2">Modo <b className="text-text-1">reingreso</b>: mueve el aforo sin invalidar la boleta.{zonas.length > 0 ? ' Elige una zona para el aforo por zona.' : ''}</p>
+            {/* Por qué «Automático» puede marcar salida a la primera: quien
+                entró por Check-in ya cuenta como dentro, así que el siguiente
+                escaneo es su salida. Dicho aquí para que no parezca un fallo
+                del lector — que es como se leía. */}
+            {sentido === 'auto' && (
+              <p className="text-[11px] text-text-3 leading-relaxed">
+                En automático alterna según el último movimiento: a quien entró por Check-in,
+                el primer escaneo le marca <b>salida</b>. Fija el sentido si vas a controlar una puerta de entrada o de salida.
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-xs text-text-3">Sentido:</span>
+            {[['auto', 'Automático'], ['entrada', 'Entrada'], ['salida', 'Salida']].map(([id, txt]) => (
+              <button key={id} type="button" onClick={() => elegirSentido(id)}
+                className={`px-2.5 py-1 rounded-full text-[11px] border transition-colors
+                  ${sentido === id ? 'border-accent bg-accent/10 text-text-1' : 'border-border text-text-3 hover:text-text-1'}`}>
+                {txt}
+              </button>
+            ))}
+          </div>
           {zonas.length > 0 && (
             <div className="flex items-center gap-2">
               <span className="text-xs text-text-3">Zona:</span>
