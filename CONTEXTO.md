@@ -33,7 +33,7 @@ picos — la apertura de registros y el recordatorio masivo.
 | `gestor-eventos-frontend` | React + Vite | Vercel → https://gestekeventost.dpdns.org |
 | `gestor-eventos-backend` | Express | cPanel → https://api.gestekeventost.dpdns.org |
 
-La base es **Supabase** (`yopontbwgdybfsniqawz`, **plan free**), Postgres 17.
+La base es **Supabase** (`yopontbwgdybfsniqawz`, **plan Pro** desde el 17-sep), Postgres 17.
 
 > **Un push a `main` despliega.** `PENDIENTE.md` decía lo contrario sobre el
 > frontend; era falso y ya está corregido. Comprobado viendo el corte en vivo.

@@ -82,7 +82,15 @@ Los dos son **públicos en la misma cuenta**, van por `main`, y **un push a
 > contesta **503**: cualquier cosa que siga apuntando ahí —un conector MCP
 > guardado, un webhook, un marcador— hay que cambiarla a mano.
 
-Base de datos: **Supabase** `yopontbwgdybfsniqawz`, Postgres 17, **plan free**.
+Base de datos: **Supabase** `yopontbwgdybfsniqawz`, Postgres 17, **plan Pro**
+desde el 17-sep (comprobado: la organización está en `pro`).
+
+> **Pro no sube la máquina solo.** El plan cambia las cuotas y quita la pausa
+> por inactividad, pero el tamaño de cómputo sigue siendo el que hubiera y se
+> cambia a mano en *Settings → Compute and Disk* — y ese cambio **reinicia la
+> base**, así que no se hace en mitad de un evento. Y el *spend cap* viene
+> encendido: con él puesto, pasarse de la cuota incluida **limita** en vez de
+> cobrar, que es justo lo que parece «el plan no se aplicó».
 
 Instalar y comprobar que todo arranca:
 

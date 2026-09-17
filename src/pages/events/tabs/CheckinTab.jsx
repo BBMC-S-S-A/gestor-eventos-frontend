@@ -390,7 +390,7 @@ export default function CheckinTab({ evento, miRolId = null, miUserId = null, pe
       });
       /* `aforo` viene con la zona ya recalculada: quien está en la puerta ve el
          número después de ESTE escaneo sin cambiar de pantalla. */
-      setLast({ reingresoMode: true, ok: true, dentro: r.dentro, ticket: r.ticket, aforo: r.aforo });
+      setLast({ reingresoMode: true, ok: true, dentro: r.dentro, ticket: r.ticket, aforo: r.aforo, salidasAuto: r.salidas_automaticas || [] });
       setHistorial(h => [{ guest_nombre: r.ticket?.nombre, codigo: r.ticket?.codigo, at: new Date(), ok: true, reingreso: r.dentro ? 'entró' : 'salió' }, ...h].slice(0, 10));
     } catch (e) {
       /* Sin conexión esto NO se encola, y es a propósito: el reingreso es un
@@ -1392,6 +1392,17 @@ function ReingresoCard({ result, compact }) {
                   {result.aforo.nombre}: <b className="tabular-nums text-text-1">{result.aforo.dentro}</b>
                   {result.aforo.aforo_max ? ` / ${result.aforo.aforo_max}` : ''}
                   {result.aforo.excedido > 0 && <span className="text-danger"> · {result.aforo.excedido} por encima del aforo</span>}
+                </p>
+              )}
+              {/* De qué sala se la sacó al entrar en ésta.
+                *
+                * Se dice porque es una salida que NADIE escaneó: la dedujo el
+                * sistema al verla entrar aquí. Sin enseñarla, quien luego mire
+                * el aforo de la otra sala vería un número que bajó solo y no
+                * podría distinguirlo de un error de conteo. */}
+              {ok && result.salidasAuto?.length > 0 && (
+                <p className="text-[11px] text-text-3 mt-1 leading-relaxed">
+                  También se registró su salida de <b className="text-text-2">{result.salidasAuto.join('», «')}</b>: una persona está en una sala a la vez.
                 </p>
               )}
             </div>
