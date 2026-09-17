@@ -3,6 +3,7 @@ import { conexionesApi } from '../../api/conexiones.js';
 import { integracionesApi } from '../../api/integraciones.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import Spinner from '../../components/ui/Spinner.jsx';
+import { API, API_DECLARADA, URL_MCP } from '../../lib/apiUrl.js';
 
 /* Conectar Claude — dos cosas distintas, y conviene no confundirlas.
 
@@ -21,7 +22,8 @@ import Spinner from '../../components/ui/Spinner.jsx';
    ofrecen los dos caminos al mismo nivel, la mitad de la gente elige el que
    deja una credencial pegada en un archivo. */
 
-const URL_API = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+/* El plan B era `''`, asi que sin la variable esta pantalla enseñaba «/mcp»
+   a secas: una URL sin host, que se copia al conector y no conecta con nada. */
 
 export default function ConectarClaude() {
   const { success, error: toastErr } = useToast();
@@ -210,12 +212,36 @@ export default function ConectarClaude() {
 
           <div className="flex gap-2 items-center flex-wrap">
             <code className="flex-1 min-w-0 text-xs text-text-1 break-all bg-bg/60 rounded-lg px-3 py-2">
-              {URL_API}/mcp
+              {URL_MCP}
             </code>
-            <button onClick={() => copiar(`${URL_API}/mcp`, 'url')} className="btn-secondary btn-sm shrink-0">
+            <button onClick={() => copiar(URL_MCP, 'url')} disabled={!API_DECLARADA} className="btn-secondary btn-sm shrink-0 disabled:opacity-40">
               {copiado === 'url' ? '✓ Copiada' : 'Copiar'}
             </button>
           </div>
+
+          {/* Una dirección que no sirve, dicha.
+           *
+           * Sin `VITE_API_URL` esta pantalla enseñaba «/mcp»: una URL sin host,
+           * que se copia igual y no conecta con nada. Y si el build es de
+           * desarrollo, enseña `localhost`, que es peor todavía — parece una
+           * dirección buena y el conector de Claude no puede alcanzarla nunca,
+           * porque corre en otra máquina.
+           *
+           * Las dos se dicen aquí en vez de dejar que alguien las pegue y se
+           * pelee con «no se pudo conectar» sin saber por qué. */}
+          {!API_DECLARADA ? (
+            <p className="text-[11px] text-danger leading-relaxed">
+              Esta copia del panel se construyó sin <code>VITE_API_URL</code>, así que esa
+              dirección está incompleta y no sirve para el conector. Hay que volver a
+              construir el panel con la variable puesta.
+            </p>
+          ) : /^https?:\/\/(localhost|127\.0\.0\.1)/.test(API) && (
+            <p className="text-[11px] text-warning leading-relaxed">
+              Es una dirección local: sirve para probar desde este equipo, pero el conector de
+              Claude corre fuera y no puede alcanzarla. Para conectar de verdad hace falta la
+              dirección pública de la API.
+            </p>
+          )}
 
           <ol className="space-y-1.5 text-xs text-text-2">
             <li><strong className="text-text-1">1.</strong> En Claude, añade un conector personalizado con esa dirección.</li>
@@ -283,7 +309,7 @@ export default function ConectarClaude() {
                   </p>
                   <p className="text-[11px] text-text-3">Después, en tu terminal:</p>
                   <code className="block text-[11px] text-text-2 break-all bg-bg/60 rounded-lg px-3 py-2">
-                    claude mcp add --transport http gestek {URL_API}/mcp --header &quot;Authorization: Bearer TU_TOKEN&quot;
+                    claude mcp add --transport http gestek {URL_MCP} --header &quot;Authorization: Bearer TU_TOKEN&quot;
                   </code>
                 </div>
               ) : (
