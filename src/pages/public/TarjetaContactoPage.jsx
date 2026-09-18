@@ -20,9 +20,9 @@ import GLoader from '../../components/ui/GLoader.jsx';
  * escarapela colgada del cuello en una ficha pública, y son datos que la ley
  * trata aparte: hacen falta autorización específica y una forma de retirarla.
  *
- * Lo que se ve es lo que la persona escribió PARA ESTO y encendió a propósito.
- * Mientras no lo encienda, esta página dice que no comparte sus datos — y lo
- * dice en vez de callar, porque quien acaba de escanear necesita saber si se
+ * Lo que se ve son los datos de contacto que eligió el organizador —nombre,
+ * teléfono, correo, cargo—, resueltos en el servidor. Cuando no hay nada que
+ * enseñar se dice por qué, porque quien acaba de escanear necesita saber si se
  * equivocó de código o si simplemente no hay nada que ver.
  */
 
@@ -52,10 +52,13 @@ export default function TarjetaContactoPage() {
 
   if (!datos?.compartido) return (
     <Marco>
-      <h1 className="text-xl font-bold font-display text-text-1 mb-2">Esta persona no comparte sus datos</h1>
+      <h1 className="text-xl font-bold font-display text-text-1 mb-2">
+        {datos?.motivo === 'persona' ? 'Esta persona prefiere no compartir sus datos' : 'Aquí no hay datos de contacto'}
+      </h1>
       <p className="text-sm text-text-2 leading-relaxed">
-        Su escarapela es válida, pero todavía no encendió su tarjeta de contacto.
-        Puede hacerlo desde su boleta, en <span className="font-mono">Mi boleta → Tarjeta de contacto</span>.
+        {datos?.motivo === 'persona'
+          ? 'Su escarapela es válida. Si quieres seguir en contacto, pídele sus datos directamente.'
+          : 'Este evento no comparte datos de contacto al escanear las escarapelas.'}
       </p>
       {datos?.evento?.slug && (
         <Link to={`/explorar/${datos.evento.slug}`} className="btn-ghost btn-sm mt-5 inline-flex">
@@ -65,25 +68,31 @@ export default function TarjetaContactoPage() {
     </Marco>
   );
 
-  const c = datos.contacto || {};
+  const soloDigitos = (t) => String(t || '').replace(/[^\d+]/g, '');
+  /* Cómo se enlaza cada dato: un correo se escribe, un teléfono se llama o se
+     abre en WhatsApp. El tipo lo pone la pregunta del evento. */
+  const enlaceDe = (d) => {
+    if (d.tipo === 'email' || /@/.test(d.valor)) return `mailto:${d.valor}`;
+    if (d.tipo === 'telefono') return `https://wa.me/${soloDigitos(d.valor).replace(/^\+/, '')}`;
+    if (/^https?:\/\//i.test(d.valor)) return d.valor;
+    return null;
+  };
+  const lista = (datos.datos || []).filter(d => d.id !== 'nombre');
+
   /* Un archivo .vcf es lo que entienden la agenda de Android y la de iPhone:
      «guardar contacto» de verdad, no un nombre que hay que volver a teclear. */
   const guardarContacto = () => {
-    const lineas = [
-      'BEGIN:VCARD', 'VERSION:3.0',
-      `FN:${datos.nombre}`,
-      c.empresa ? `ORG:${c.empresa}` : null,
-      c.cargo ? `TITLE:${c.cargo}` : null,
-      c.email ? `EMAIL;TYPE=INTERNET:${c.email}` : null,
-      c.telefono ? `TEL;TYPE=CELL:${c.telefono}` : null,
-      c.whatsapp && c.whatsapp !== c.telefono ? `TEL;TYPE=CELL:${c.whatsapp}` : null,
-      c.web ? `URL:${c.web}` : null,
-      c.linkedin ? `URL:${c.linkedin}` : null,
-      c.nota ? `NOTE:${c.nota.replace(/\n/g, ' ')}` : null,
-      datos.evento?.titulo ? `NOTE:Nos conocimos en ${datos.evento.titulo}` : null,
-      'END:VCARD',
-    ].filter(Boolean).join('\n');
-    const url = URL.createObjectURL(new Blob([lineas], { type: 'text/vcard' }));
+    const lineas = ['BEGIN:VCARD', 'VERSION:3.0', `FN:${datos.nombre}`];
+    for (const d of lista) {
+      if (d.tipo === 'email' || /@/.test(d.valor)) lineas.push(`EMAIL;TYPE=INTERNET:${d.valor}`);
+      else if (d.tipo === 'telefono') lineas.push(`TEL;TYPE=CELL:${d.valor}`);
+      else if (/cargo|rol|puesto/i.test(d.etiqueta)) lineas.push(`TITLE:${d.valor}`);
+      else if (/empresa|organizaci|instituci|entidad|startup/i.test(d.etiqueta)) lineas.push(`ORG:${d.valor}`);
+      else lineas.push(`NOTE:${d.etiqueta}: ${d.valor}`);
+    }
+    if (datos.evento?.titulo) lineas.push(`NOTE:Nos conocimos en ${datos.evento.titulo}`);
+    lineas.push('END:VCARD');
+    const url = URL.createObjectURL(new Blob([lineas.join('\n')], { type: 'text/vcard' }));
     const a = document.createElement('a');
     a.href = url;
     a.download = `${datos.nombre.replace(/[^\w.-]+/g, '-').slice(0, 40) || 'contacto'}.vcf`;
@@ -93,46 +102,40 @@ export default function TarjetaContactoPage() {
     URL.revokeObjectURL(url);
   };
 
-  const soloDigitos = (t) => String(t || '').replace(/[^\d]/g, '');
-
   return (
     <Marco>
       <p className="text-[11px] uppercase tracking-widest text-text-3 font-semibold">
         {datos.evento?.titulo || 'Tarjeta de contacto'}
       </p>
       <h1 className="text-2xl font-bold font-display text-text-1 mt-1">{datos.nombre}</h1>
-      {(c.cargo || c.empresa) && (
-        <p className="text-sm text-text-2 mt-1">
-          {[c.cargo, c.empresa].filter(Boolean).join(' · ')}
-        </p>
-      )}
-      {c.nota && <p className="text-sm text-text-2 mt-4 whitespace-pre-line leading-relaxed">{c.nota}</p>}
-
       <div className="mt-6 space-y-2">
-        {c.whatsapp && (
-          <Fila etiqueta="WhatsApp" valor={c.whatsapp} href={`https://wa.me/${soloDigitos(c.whatsapp)}`} />
-        )}
-        {c.telefono && <Fila etiqueta="Teléfono" valor={c.telefono} href={`tel:${soloDigitos(c.telefono)}`} />}
-        {c.email && <Fila etiqueta="Correo" valor={c.email} href={`mailto:${c.email}`} />}
-        {c.linkedin && <Fila etiqueta="LinkedIn" valor={c.linkedin} href={c.linkedin} />}
-        {c.web && <Fila etiqueta="Web" valor={c.web} href={c.web} />}
+        {lista.map(d => (
+          <Fila key={d.id} etiqueta={d.etiqueta} valor={d.valor} href={enlaceDe(d)} />
+        ))}
       </div>
 
       <button onClick={guardarContacto} className="btn-gradient w-full mt-6">Guardar contacto</button>
       <p className="text-[11px] text-text-3 mt-3 leading-relaxed">
-        Estos datos los publicó {datos.nombre.split(' ')[0]} para este evento. No incluyen nada
-        de su registro.
+        Son los datos de contacto que este evento comparte para el networking. No incluyen
+        nada más de su registro.
       </p>
     </Marco>
   );
 }
 
 function Fila({ etiqueta, valor, href }) {
+  const clases = 'flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-2/40 px-4 py-3';
+  const dentro = (
+    <>
+      <span className="text-[11px] uppercase tracking-widest text-text-3 font-semibold truncate">{etiqueta}</span>
+      <span className="text-sm text-text-1 truncate">{valor}</span>
+    </>
+  );
+  if (!href) return <div className={clases}>{dentro}</div>;
   return (
     <a href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noreferrer"
-       className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-surface-2/40 px-4 py-3 hover:border-primary/40 transition-colors">
-      <span className="text-[11px] uppercase tracking-widest text-text-3 font-semibold">{etiqueta}</span>
-      <span className="text-sm text-text-1 truncate">{valor}</span>
+       className={`${clases} hover:border-primary/40 transition-colors`}>
+      {dentro}
     </a>
   );
 }

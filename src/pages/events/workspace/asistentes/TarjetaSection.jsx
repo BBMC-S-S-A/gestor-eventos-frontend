@@ -4,6 +4,7 @@ import { clientesApi } from '../../../../api/clientes.js';
 import { useToast } from '../../../../context/ToastContext.jsx';
 import ImagePicker from '../../../../components/ui/ImagePicker.jsx';
 import WalletCard from '../../../../components/public/WalletCard.jsx';
+import CompartirAlEscanear from './CompartirAlEscanear.jsx';
 import {
   walletVariantes, nuevaVariante, PUBLICOS,
   reglasPuntos, REGLAS_PUNTOS, ALCANCES,
@@ -91,6 +92,10 @@ export default function TarjetaSection({ evento }) {
 
   return (
     <div className="space-y-6 max-w-5xl">
+      {/* Qué ve quien escanea el QR de alguien con su celular. Es del evento,
+          no de cada variante de diseño, y se guarda aparte. */}
+      <CompartirAlEscanear evento={evento} />
+
       {/* ── Selector de variantes ── */}
       <div className="flex items-center gap-2 flex-wrap">
         {variantes.map((x, i) => (

@@ -50,8 +50,14 @@ export const eventosApi = {
      Sólo trae lo que esa persona escribió y encendió a propósito: nada del
      formulario de registro. */
   tarjetaContacto : (codigo)   => client.get(`/eventos/publicos/contacto/${codigo}`).then(r => r.data),
-  guardarTarjetaContacto : (codigo, contacto, publico) =>
-    client.put(`/eventos/publicos/contacto/${codigo}`, { contacto, publico }).then(r => r.data),
+  /* «No quiero que aparezcan mis datos». Sólo oculta o muestra: con los datos
+     ocultos, el QR sigue sirviendo para entrar. */
+  ocultarTarjetaContacto : (codigo, oculto) =>
+    client.put(`/eventos/publicos/contacto/${codigo}`, { oculto }).then(r => r.data),
+  /* Qué puede elegir el organizador para compartir, y qué no (con la misma
+     regla con la que el servidor publica). */
+  opcionesTarjetaContacto : (eventoId) =>
+    client.get(`/eventos/${eventoId}/tarjeta-contacto`).then(r => r.data),
   /* «¿Esta boleta es real?», para quien la está COMPRANDO a otra persona.
      Es una ruta distinta de `ticketByCode` a propósito: aquella devuelve la
      entrada entera con su `qr_token`, así que enseñársela a quien todavía no ha

@@ -191,12 +191,13 @@ export default function MiTicketPage() {
         </Link>
       )}
 
-      {/* El otro uso del mismo QR: presentarse. Apagado mientras la persona no
-          lo encienda, y con campos propios — nunca lo del formulario. */}
+      {/* El otro uso del mismo QR: presentarse. Abierto desde el registro con
+          los datos de contacto que eligió el organizador, y con la salida a un
+          toque. La lista la resuelve el servidor (`tarjeta_contacto`). */}
       <TarjetaDeContacto
         codigo={ticket.codigo}
-        inicial={ticket.contacto || {}}
-        publicoInicial={ticket.contacto_publico}
+        campos={ticket.tarjeta_contacto?.campos || []}
+        ocultoInicial={ticket.tarjeta_contacto?.oculto}
       />
 
       {/* Si es una boleta de stand, la empresa edita su ficha de expositor */}
