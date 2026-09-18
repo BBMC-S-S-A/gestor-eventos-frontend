@@ -55,6 +55,11 @@ export default function EtiquetadoraSection({ evento }) {
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('');
   const [sel, setSel] = useState(new Set());
+  /* Las dos preguntas del mostrador: «¿a quién le falta la escarapela?» y
+     «¿quién se registró hoy?». Se responden sobre la lista que ya está en
+     pantalla, así que cambiar de filtro es instantáneo. */
+  const [verImpresas, setVerImpresas] = useState('faltan'); // faltan | impresas | todas
+  const [cuando, setCuando] = useState('todas');            // hoy | mes | todas
 
   const cfg = useMemo(
     () => impresionConfig(evento.page_json, { publico: 'asistentes' }) || {},
@@ -68,8 +73,8 @@ export default function EtiquetadoraSection({ evento }) {
    * recargar la pestaña entera —tres mil boletas, dieciséis peticiones— y
    * mientras tanto se formaba la fila.
    *
-   * Ahora hay dos caminos: la carga completa al abrir, y cada quince segundos
-   * una consulta pequeña de las 200 últimas que se mezcla con lo que ya hay.
+   * Ahora hay dos caminos: la carga completa al abrir, y cada minuto una
+   * consulta pequeña de las 200 últimas que se mezcla con lo que ya hay.
    * Lo nuevo entra arriba; lo que ya estaba no se vuelve a pedir. */
   const traerTodo = useCallback(() => {
     setLoading(true);
@@ -97,23 +102,56 @@ export default function EtiquetadoraSection({ evento }) {
            sobre lo que ya está en pantalla. */
         .catch(() => {});
     };
-    const t = setInterval(mirarNuevos, 15000);
+    /* Cada minuto, y no cada quince segundos: son varias estaciones abiertas
+       todo el día contra el mismo servidor, y en la puerta lo que se nota es
+       que la persona aparezca «enseguida», no que aparezca en quince
+       segundos. El botón «Actualizar» está para quien no quiere esperar. */
+    const t = setInterval(mirarNuevos, 60000);
     return () => { vivo = false; clearInterval(t); };
   }, [evento.id]);
 
   /* Busca por nombre, correo, código y tipo: en la puerta se busca por lo que
      la persona dice o por lo que trae escrito, y quien está imprimiendo no
      tiene por qué saber por cuál de los cuatro va a encontrarla. */
+  /* El corte de «hoy» y «este mes» se calcula en la hora del EVENTO: en la
+     puerta, a las siete de la mañana en Ibagué, «hoy» no puede empezar a
+     depender de la zona horaria del portátil de quien imprime. */
+  const zona = evento.timezone || 'America/Bogota';
+  const diaDe = useCallback((fecha) => {
+    if (!fecha) return '';
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: zona, year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date(fecha));
+    } catch { return String(fecha).slice(0, 10); }
+  }, [zona]);
+
   const filas = useMemo(() => {
     const busca = filtro.trim().toLowerCase();
-    if (!busca) return clientes;
-    const palabras = busca.split(/\s+/).filter(Boolean);
+    const palabras = busca ? busca.split(/\s+/).filter(Boolean) : [];
+    const hoy = diaDe(Date.now());
+    const mes = hoy.slice(0, 7);
     return clientes.filter(c => {
+      if (verImpresas === 'faltan'   && c.escarapela_impresa_at) return false;
+      if (verImpresas === 'impresas' && !c.escarapela_impresa_at) return false;
+      if (cuando !== 'todas') {
+        const dia = diaDe(c.created_at);
+        if (cuando === 'hoy' && dia !== hoy) return false;
+        if (cuando === 'mes' && !dia.startsWith(mes)) return false;
+      }
+      if (!palabras.length) return true;
       const t = [c.guest_nombre, c.usuario?.nombre, c.guest_email, c.usuario?.email, c.codigo, c.tipo?.nombre]
         .filter(Boolean).join(' ').toLowerCase();
       return palabras.every(w => t.includes(w));
     });
-  }, [clientes, filtro]);
+  }, [clientes, filtro, verImpresas, cuando, diaDe]);
+
+  /* Cuántas van y cuántas faltan, que es lo que se pregunta cada media hora en
+     el mostrador. Sale de la lista completa, no de lo filtrado. */
+  const cuenta = useMemo(() => {
+    const impresas = clientes.filter(c => c.escarapela_impresa_at).length;
+    return { impresas, faltan: clientes.length - impresas, total: clientes.length };
+  }, [clientes]);
 
   const etq = piezas.find(x => x.id === piezaId) || piezas[0];
 
@@ -222,6 +260,37 @@ export default function EtiquetadoraSection({ evento }) {
    * cual, se genera un PNG por boleta —a 8 px/mm, que a 203 dpi es un punto
    * del cabezal por píxel— y se manda a imprimir esa imagen. Ver
    * `lib/etiquetaPng.js` para el porqué completo. */
+  /* Dejar anotado lo que acaba de salir por la impresora.
+   *
+   * Se hace DESPUÉS de mandar a imprimir y nunca antes: si esto fallara, la
+   * escarapela ya salió y lo único que se pierde es la marca. Al revés —marcar
+   * y que la impresión falle— dejaría a alguien fuera de la lista de «faltan»
+   * sin tener nada en la mano.
+   *
+   * La respuesta actualiza la lista en memoria para que la fila cambie de
+   * grupo en el acto, sin esperar al refresco del minuto. */
+  const anotarImpresas = async (tickets) => {
+    const ids = tickets.map(t => t.id).filter(Boolean);
+    if (!ids.length) return;
+    try {
+      await clientesApi.marcarImpresas(evento.id, ids);
+      const ahora = new Date().toISOString();
+      const marcados = new Set(ids);
+      setClientes(previos => previos.map(c => (
+        marcados.has(c.id) && !c.escarapela_impresa_at ? { ...c, escarapela_impresa_at: ahora } : c
+      )));
+      setSel(new Set());
+    } catch (e) {
+      toastErr(`Se imprimieron, pero no se pudo anotar cuáles: ${e.response?.data?.error || e.message}`);
+    }
+  };
+
+  const imprimirEnPapel = () => {
+    const tanda = aImprimir;
+    window.print();
+    anotarImpresas(tanda);
+  };
+
   const imprimirPorPng = async () => {
     setImprimiendoPng(true);
     try {
@@ -232,6 +301,7 @@ export default function EtiquetadoraSection({ evento }) {
         logoUrl: cfg.logo_url || '',
         mostrarCodigo: cfg.mostrar?.codigo !== false,
       });
+      if (generadas > 0) await anotarImpresas(aImprimir);
       if (generadas === 0) {
         toastErr('No se pudo generar ninguna escarapela — revisa que el navegador no haya bloqueado la ventana emergente.');
       } else if (generadas < aImprimir.length) {
@@ -465,6 +535,26 @@ export default function EtiquetadoraSection({ evento }) {
           <p className="text-sm text-text-2">Cuando tengas asistentes inscritos podrás imprimir sus escarapelas aquí.</p>
         </div>
       ) : (<>
+        {/* Cómo se reparte la lista. Es lo que convierte «tres mil nombres» en
+            «los que faltan de hoy», que es con lo que se trabaja en la puerta. */}
+        <div className="flex items-center gap-2 flex-wrap no-print">
+          {[['faltan', `Faltan ${cuenta.faltan}`], ['impresas', `Impresas ${cuenta.impresas}`], ['todas', `Todas ${cuenta.total}`]].map(([k, l]) => (
+            <button key={k} onClick={() => { setVerImpresas(k); setSel(new Set()); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors
+                ${verImpresas === k ? 'border-accent bg-accent/10 text-text-1' : 'border-border text-text-3 hover:text-text-1'}`}>
+              {l}
+            </button>
+          ))}
+          <span className="text-text-3 px-1">·</span>
+          {[['hoy', 'Registrados hoy'], ['mes', 'Este mes'], ['todas', 'Desde siempre']].map(([k, l]) => (
+            <button key={k} onClick={() => { setCuando(k); setSel(new Set()); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors
+                ${cuando === k ? 'border-accent bg-accent/10 text-text-1' : 'border-border text-text-3 hover:text-text-1'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center justify-between gap-3 flex-wrap no-print">
           <div className="flex items-center gap-2">
             <input className="input !h-9 w-64" placeholder="Buscar por nombre, correo o código…"
@@ -483,7 +573,7 @@ export default function EtiquetadoraSection({ evento }) {
               title="Genera un PNG por escarapela y lo manda a imprimir, en vez de mandar el HTML. Úsalo si el driver de la impresora reescala o corta la impresión normal.">
               {imprimiendoPng ? 'Generando…' : 'Imprimir por imagen (PNG)'}
             </button>
-            <button onClick={() => window.print()} disabled={!!problema || !aImprimir.length} className="btn-primary btn-sm">
+            <button onClick={imprimirEnPapel} disabled={!!problema || !aImprimir.length} className="btn-primary btn-sm">
               {aImprimir.length
                 ? `Imprimir ${aImprimir.length} etiqueta${aImprimir.length !== 1 ? 's' : ''}`
                 : 'Elige a quién imprimir'}
@@ -502,6 +592,9 @@ export default function EtiquetadoraSection({ evento }) {
                 <input type="checkbox" readOnly checked={sel.has(f.id)} className="accent-[#8B5CF6]" />
                 <span className="text-sm text-text-1 flex-1 truncate">{f.guest_nombre || f.usuario?.nombre || 'Asistente'}</span>
                 <span className="text-xs text-text-3 font-mono">{f.codigo || ''}</span>
+                {f.escarapela_impresa_at && (
+                  <span className="text-[10px] uppercase tracking-wide text-success border border-success/40 rounded-lg px-1.5 py-0.5">impresa</span>
+                )}
                 <span className="text-xs text-text-3">{f.tipo?.nombre || 'General'}</span>
               </li>
             ))}

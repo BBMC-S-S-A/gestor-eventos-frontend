@@ -63,6 +63,11 @@ export const clientesApi = {
        ultima. */
     return { ...(ultima || {}), clientes: todos, total: ultima?.total ?? todos.length };
   },
+  /* Dejar anotado que estas escarapelas ya se imprimieron.
+     Va en la boleta y no en este navegador: en la puerta hay varias
+     estaciones, y lo que una imprimió tiene que verlo la otra. */
+  marcarImpresas: (eventoId, ids, reimprimir = false) =>
+    client.post(`/eventos/${eventoId}/clientes/escarapelas-impresas`, { ids, reimprimir }).then(r => r.data),
   /* Cuanto trajo cada boton de registro. `origen: null` es «directo»: quien
      llego a la pagina del evento sin pasar por ningun boton. */
   origenes     : (eventoId)                     => client.get(`/eventos/${eventoId}/origenes`).then(r => r.data),
