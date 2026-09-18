@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { clientesApi } from '../../../../api/clientes.js';
 import ImprimirEtiquetas from '../../../../components/public/ImprimirEtiquetas.jsx';
 import EtiquetaTermica from '../../../../components/public/EtiquetaTermica.jsx';
@@ -55,23 +55,103 @@ export default function EtiquetadoraSection({ evento }) {
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('');
   const [sel, setSel] = useState(new Set());
+  /* Las dos preguntas del mostrador: «¿a quién le falta la escarapela?» y
+     «¿quién se registró hoy?». Se responden sobre la lista que ya está en
+     pantalla, así que cambiar de filtro es instantáneo. */
+  const [verImpresas, setVerImpresas] = useState('faltan'); // faltan | impresas | todas
+  const [cuando, setCuando] = useState('todas');            // hoy | mes | todas
 
   const cfg = useMemo(
     () => impresionConfig(evento.page_json, { publico: 'asistentes' }) || {},
     [evento.page_json],
   );
 
-  useEffect(() => {
-    clientesApi.listarTodos(evento.id)
+  /* ── Que quien acaba de registrarse aparezca ──────────────────────────
+   *
+   * La lista se pedía UNA vez al abrir la pantalla. En la puerta de FESTECH
+   * eso significaba que quien se registraba en el momento no salía hasta
+   * recargar la pestaña entera —tres mil boletas, dieciséis peticiones— y
+   * mientras tanto se formaba la fila.
+   *
+   * Ahora hay dos caminos: la carga completa al abrir, y cada minuto una
+   * consulta pequeña de las 200 últimas que se mezcla con lo que ya hay.
+   * Lo nuevo entra arriba; lo que ya estaba no se vuelve a pedir. */
+  const traerTodo = useCallback(() => {
+    setLoading(true);
+    return clientesApi.listarTodos(evento.id)
       .then(d => setClientes(d.clientes || d.tickets || []))
       .finally(() => setLoading(false));
   }, [evento.id]);
 
-  const filas = useMemo(() => clientes.filter(c => {
-    if (!filtro) return true;
-    const t = `${c.guest_nombre || c.usuario?.nombre || ''} ${c.tipo?.nombre || ''}`.toLowerCase();
-    return t.includes(filtro.toLowerCase());
-  }), [clientes, filtro]);
+  useEffect(() => { traerTodo(); }, [traerTodo]);
+
+  useEffect(() => {
+    let vivo = true;
+    const mirarNuevos = () => {
+      clientesApi.list(evento.id, { limit: 200, page: 1, stats: 0 })
+        .then(d => {
+          if (!vivo) return;
+          const ultimos = d.clientes || [];
+          setClientes(previos => {
+            const conocidos = new Set(previos.map(c => c.id));
+            const nuevos = ultimos.filter(c => c?.id && !conocidos.has(c.id));
+            return nuevos.length ? [...nuevos, ...previos] : previos;
+          });
+        })
+        /* Un fallo aquí no puede vaciar la lista ni molestar: es un extra
+           sobre lo que ya está en pantalla. */
+        .catch(() => {});
+    };
+    /* Cada minuto, y no cada quince segundos: son varias estaciones abiertas
+       todo el día contra el mismo servidor, y en la puerta lo que se nota es
+       que la persona aparezca «enseguida», no que aparezca en quince
+       segundos. El botón «Actualizar» está para quien no quiere esperar. */
+    const t = setInterval(mirarNuevos, 60000);
+    return () => { vivo = false; clearInterval(t); };
+  }, [evento.id]);
+
+  /* Busca por nombre, correo, código y tipo: en la puerta se busca por lo que
+     la persona dice o por lo que trae escrito, y quien está imprimiendo no
+     tiene por qué saber por cuál de los cuatro va a encontrarla. */
+  /* El corte de «hoy» y «este mes» se calcula en la hora del EVENTO: en la
+     puerta, a las siete de la mañana en Ibagué, «hoy» no puede empezar a
+     depender de la zona horaria del portátil de quien imprime. */
+  const zona = evento.timezone || 'America/Bogota';
+  const diaDe = useCallback((fecha) => {
+    if (!fecha) return '';
+    try {
+      return new Intl.DateTimeFormat('en-CA', {
+        timeZone: zona, year: 'numeric', month: '2-digit', day: '2-digit',
+      }).format(new Date(fecha));
+    } catch { return String(fecha).slice(0, 10); }
+  }, [zona]);
+
+  const filas = useMemo(() => {
+    const busca = filtro.trim().toLowerCase();
+    const palabras = busca ? busca.split(/\s+/).filter(Boolean) : [];
+    const hoy = diaDe(Date.now());
+    const mes = hoy.slice(0, 7);
+    return clientes.filter(c => {
+      if (verImpresas === 'faltan'   && c.escarapela_impresa_at) return false;
+      if (verImpresas === 'impresas' && !c.escarapela_impresa_at) return false;
+      if (cuando !== 'todas') {
+        const dia = diaDe(c.created_at);
+        if (cuando === 'hoy' && dia !== hoy) return false;
+        if (cuando === 'mes' && !dia.startsWith(mes)) return false;
+      }
+      if (!palabras.length) return true;
+      const t = [c.guest_nombre, c.usuario?.nombre, c.guest_email, c.usuario?.email, c.codigo, c.tipo?.nombre]
+        .filter(Boolean).join(' ').toLowerCase();
+      return palabras.every(w => t.includes(w));
+    });
+  }, [clientes, filtro, verImpresas, cuando, diaDe]);
+
+  /* Cuántas van y cuántas faltan, que es lo que se pregunta cada media hora en
+     el mostrador. Sale de la lista completa, no de lo filtrado. */
+  const cuenta = useMemo(() => {
+    const impresas = clientes.filter(c => c.escarapela_impresa_at).length;
+    return { impresas, faltan: clientes.length - impresas, total: clientes.length };
+  }, [clientes]);
 
   const etq = piezas.find(x => x.id === piezaId) || piezas[0];
 
@@ -112,7 +192,19 @@ export default function EtiquetadoraSection({ evento }) {
 
   const toggle = (id) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const todos = () => setSel(s => s.size === filas.length ? new Set() : new Set(filas.map(f => f.id)));
-  const aImprimir = filas.filter(f => sel.size === 0 || sel.has(f.id));
+  /* ── Qué se imprime ───────────────────────────────────────────────────
+   *
+   * Antes: «nada seleccionado» significaba TODOS. En la puerta eso se vivía al
+   * revés de como se piensa —para imprimir una sola escarapela había que
+   * seleccionar todas y luego ir quitando— y con tres mil boletas delante es
+   * la diferencia entre una etiqueta y tres mil.
+   *
+   * Ahora manda lo seleccionado. Sin selección y con una búsqueda escrita, se
+   * imprime lo que la búsqueda dejó a la vista, que es lo que se está mirando;
+   * sin selección y sin búsqueda no se imprime nada, y el botón lo dice. */
+  const aImprimir = sel.size
+    ? filas.filter(f => sel.has(f.id))
+    : (filtro.trim() ? filas : []);
 
   /* Baja la vista previa como PNG, a la resolución exacta de la impresora.
    *
@@ -168,6 +260,69 @@ export default function EtiquetadoraSection({ evento }) {
    * cual, se genera un PNG por boleta —a 8 px/mm, que a 203 dpi es un punto
    * del cabezal por píxel— y se manda a imprimir esa imagen. Ver
    * `lib/etiquetaPng.js` para el porqué completo. */
+  /* Dejar anotado lo que acaba de salir por la impresora.
+   *
+   * Se hace DESPUÉS de mandar a imprimir y nunca antes: si esto fallara, la
+   * escarapela ya salió y lo único que se pierde es la marca. Al revés —marcar
+   * y que la impresión falle— dejaría a alguien fuera de la lista de «faltan»
+   * sin tener nada en la mano.
+   *
+   * La respuesta actualiza la lista en memoria para que la fila cambie de
+   * grupo en el acto, sin esperar al refresco del minuto. */
+  const anotarImpresas = async (tickets) => {
+    const ids = tickets.map(t => t.id).filter(Boolean);
+    if (!ids.length) return;
+    try {
+      await clientesApi.marcarImpresas(evento.id, ids);
+      const ahora = new Date().toISOString();
+      const marcados = new Set(ids);
+      setClientes(previos => previos.map(c => (
+        marcados.has(c.id) && !c.escarapela_impresa_at ? { ...c, escarapela_impresa_at: ahora } : c
+      )));
+      setSel(new Set());
+    } catch (e) {
+      toastErr(`Se imprimieron, pero no se pudo anotar cuáles: ${e.response?.data?.error || e.message}`);
+    }
+  };
+
+  /* ── Reimprimir la de una persona ─────────────────────────────────────
+   *
+   * El caso es de la puerta del día 2: alguien vino ayer, hoy llega sin su
+   * escarapela y hay fila detrás. Antes había que dejarla seleccionada a ella
+   * sola, imprimir, y acordarse de deshacer la selección.
+   *
+   * `reimprimir: true` es a propósito: la hora y el nombre de quien la imprimió
+   * la PRIMERA vez no se pisan, así que después se puede ver quién pasó dos
+   * veces por el mostrador — que es justo lo que se mira cuando las escarapelas
+   * no cuadran con la gente que entró. */
+  const [reimprimiendo, setReimprimiendo] = useState(null);
+  const reimprimirUna = async (ticket) => {
+    setReimprimiendo(ticket.id);
+    try {
+      const generadas = await imprimirComoPng({
+        etiqueta: etq,
+        tickets: [ticket],
+        qrDe: (t) => valorQr(etq, t),
+        logoUrl: cfg.logo_url || '',
+        mostrarCodigo: cfg.mostrar?.codigo !== false,
+      });
+      if (!generadas) {
+        toastErr('No se pudo generar la escarapela — revisa que el navegador no haya bloqueado la ventana emergente.');
+        return;
+      }
+      await clientesApi.marcarImpresas(evento.id, [ticket.id], true);
+      success(`Reimpresa la de ${ticket.guest_nombre || ticket.usuario?.nombre || 'la persona'}.`);
+    } catch (e) {
+      toastErr(e.response?.data?.error || e.message);
+    } finally { setReimprimiendo(null); }
+  };
+
+  const imprimirEnPapel = () => {
+    const tanda = aImprimir;
+    window.print();
+    anotarImpresas(tanda);
+  };
+
   const imprimirPorPng = async () => {
     setImprimiendoPng(true);
     try {
@@ -178,6 +333,7 @@ export default function EtiquetadoraSection({ evento }) {
         logoUrl: cfg.logo_url || '',
         mostrarCodigo: cfg.mostrar?.codigo !== false,
       });
+      if (generadas > 0) await anotarImpresas(aImprimir);
       if (generadas === 0) {
         toastErr('No se pudo generar ninguna escarapela — revisa que el navegador no haya bloqueado la ventana emergente.');
       } else if (generadas < aImprimir.length) {
@@ -411,12 +567,37 @@ export default function EtiquetadoraSection({ evento }) {
           <p className="text-sm text-text-2">Cuando tengas asistentes inscritos podrás imprimir sus escarapelas aquí.</p>
         </div>
       ) : (<>
+        {/* Cómo se reparte la lista. Es lo que convierte «tres mil nombres» en
+            «los que faltan de hoy», que es con lo que se trabaja en la puerta. */}
+        <div className="flex items-center gap-2 flex-wrap no-print">
+          {[['faltan', `Faltan ${cuenta.faltan}`], ['impresas', `Impresas ${cuenta.impresas}`], ['todas', `Todas ${cuenta.total}`]].map(([k, l]) => (
+            <button key={k} onClick={() => { setVerImpresas(k); setSel(new Set()); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors
+                ${verImpresas === k ? 'border-accent bg-accent/10 text-text-1' : 'border-border text-text-3 hover:text-text-1'}`}>
+              {l}
+            </button>
+          ))}
+          <span className="text-text-3 px-1">·</span>
+          {[['hoy', 'Registrados hoy'], ['mes', 'Este mes'], ['todas', 'Desde siempre']].map(([k, l]) => (
+            <button key={k} onClick={() => { setCuando(k); setSel(new Set()); }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium border transition-colors
+                ${cuando === k ? 'border-accent bg-accent/10 text-text-1' : 'border-border text-text-3 hover:text-text-1'}`}>
+              {l}
+            </button>
+          ))}
+        </div>
+
         <div className="flex items-center justify-between gap-3 flex-wrap no-print">
           <div className="flex items-center gap-2">
-            <input className="input !h-9 w-64" placeholder="Filtrar por nombre o tipo…"
+            <input className="input !h-9 w-64" placeholder="Buscar por nombre, correo o código…"
               value={filtro} onChange={e => setFiltro(e.target.value)} />
             <button onClick={todos} className="btn-ghost btn-sm">
-              {sel.size === filas.length ? 'Quitar selección' : 'Seleccionar todos'}
+              {sel.size === filas.length && filas.length ? 'Quitar selección' : `Seleccionar ${filas.length}`}
+            </button>
+            {/* La lista se refresca sola cada quince segundos; esto es para
+                quien tiene a la persona delante y no quiere esperar. */}
+            <button onClick={traerTodo} disabled={loading} className="btn-ghost btn-sm">
+              {loading ? 'Actualizando…' : 'Actualizar'}
             </button>
           </div>
           <div className="flex items-center gap-2">
@@ -424,8 +605,10 @@ export default function EtiquetadoraSection({ evento }) {
               title="Genera un PNG por escarapela y lo manda a imprimir, en vez de mandar el HTML. Úsalo si el driver de la impresora reescala o corta la impresión normal.">
               {imprimiendoPng ? 'Generando…' : 'Imprimir por imagen (PNG)'}
             </button>
-            <button onClick={() => window.print()} disabled={!!problema} className="btn-primary btn-sm">
-              Imprimir {aImprimir.length} etiqueta{aImprimir.length !== 1 ? 's' : ''}
+            <button onClick={imprimirEnPapel} disabled={!!problema || !aImprimir.length} className="btn-primary btn-sm">
+              {aImprimir.length
+                ? `Imprimir ${aImprimir.length} etiqueta${aImprimir.length !== 1 ? 's' : ''}`
+                : 'Elige a quién imprimir'}
             </button>
           </div>
         </div>
@@ -438,9 +621,22 @@ export default function EtiquetadoraSection({ evento }) {
           <ul className="divide-y divide-border">
             {filas.map(f => (
               <li key={f.id} className="flex items-center gap-3 px-4 py-2 hover:bg-surface-2/40 cursor-pointer" onClick={() => toggle(f.id)}>
-                <input type="checkbox" readOnly checked={sel.size === 0 || sel.has(f.id)} className="accent-[#8B5CF6]" />
+                <input type="checkbox" readOnly checked={sel.has(f.id)} className="accent-[#8B5CF6]" />
                 <span className="text-sm text-text-1 flex-1 truncate">{f.guest_nombre || f.usuario?.nombre || 'Asistente'}</span>
+                <span className="text-xs text-text-3 font-mono">{f.codigo || ''}</span>
+                {f.escarapela_impresa_at && (
+                  <span className="text-[10px] uppercase tracking-wide text-success border border-success/40 rounded-lg px-1.5 py-0.5">impresa</span>
+                )}
                 <span className="text-xs text-text-3">{f.tipo?.nombre || 'General'}</span>
+                {/* Reimprimir sin tocar la selección: quien llega sin su
+                    escarapela tiene a alguien detrás en la fila. */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); reimprimirUna(f); }}
+                  disabled={!!problema || reimprimiendo === f.id}
+                  title="Volver a imprimir sólo esta escarapela"
+                  className="btn-ghost btn-sm !py-0.5 !px-2 text-[11px] flex-shrink-0">
+                  {reimprimiendo === f.id ? 'Generando…' : 'Reimprimir'}
+                </button>
               </li>
             ))}
           </ul>

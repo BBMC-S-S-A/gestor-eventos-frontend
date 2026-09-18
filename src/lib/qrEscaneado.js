@@ -52,6 +52,12 @@ export function leerQr(texto) {
   /* Escarapelas impresas con el formato viejo. */
   const m = s.match(/\/mi-ticket\/([A-Za-z0-9]+)/);
   if (m) return { codigo: m[1].toUpperCase() };
+  /* El QR que además presenta a la persona: `https://…/p/ABCD1234`. Lo abre la
+     cámara de otro asistente como una tarjeta de contacto, y aquí —en la
+     puerta— es el mismo código de siempre. Que el papel valga para las dos
+     cosas depende de que el escáner entienda esta forma. */
+  const c = s.match(/\/p\/([A-Za-z0-9]+)/);
+  if (c) return { codigo: c[1].toUpperCase() };
   /* QR "simplificado" de una manilla o etiqueta pequeña: el código corto
      suelto, sin firma. Sin esto se manda como `qr_token` y el servidor lo
      rechaza por no ser un JWT válido. */
