@@ -78,20 +78,26 @@ export const FORMATOS_CODIGO = [
 /* Los tipos que conoce la plataforma. Un evento puede partir de uno y cambiarle
    lo que quiera; lo que no puede es inventarse el ancho de un rollo que no
    existe, y por eso cada uno trae medidas reales de material que se compra. */
+/* Las piezas nuevas salen con «Enlace de contacto» (decidido con quien
+   organiza, 18-sep): el mismo QR abre la puerta con el escáner del evento y,
+   con la cámara normal de cualquier celular, lleva a la página de «conectar»
+   con esa persona. La firma completa sigue disponible para quien la prefiera:
+   es más difícil de falsificar, pero ningún celular la entiende por sí solo.
+   Las piezas ya guardadas no cambian: llevan su elección escrita. */
 export const TIPOS_PIEZA = [
   {
     id: 'escarapela',
     nombre: 'Escarapela',
     pista: 'La de colgar del cuello. Es la que se lee de lejos.',
     medidas: { ancho: 100, alto: 50, margen: 3, qr_objetivo: 40, disposicion: 'auto' },
-    qr_contenido: 'token',
+    qr_contenido: 'contacto',
   },
   {
     id: 'tarjeta',
     nombre: 'Tarjeta',
     pista: 'Tamaño de tarjeta bancaria (ISO 7810). Entra en cualquier portatarjetas.',
     medidas: { ancho: 85.6, alto: 54, margen: 3, qr_objetivo: 38, disposicion: 'auto' },
-    qr_contenido: 'token',
+    qr_contenido: 'contacto',
   },
   {
     id: 'manilla',
@@ -116,14 +122,14 @@ export const TIPOS_PIEZA = [
     nombre: 'Etiqueta pequeña',
     pista: 'Para marcar cosas: equipaje, sillas, cajas.',
     medidas: { ancho: 70, alto: 40, margen: 2, qr_objetivo: 30, disposicion: 'auto' },
-    qr_contenido: 'token',
+    qr_contenido: 'contacto',
   },
   {
     id: 'colgante',
     nombre: 'Colgante grande',
     pista: 'Vertical, para prensa y staff. El nombre se lee a varios metros.',
     medidas: { ancho: 100, alto: 150, margen: 5, qr_objetivo: 60, disposicion: 'debajo' },
-    qr_contenido: 'token',
+    qr_contenido: 'contacto',
   },
 ];
 
