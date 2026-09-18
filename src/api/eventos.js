@@ -78,6 +78,10 @@ export const eventosApi = {
   completarFormularioTicket: (codigo, respuestas) =>
     client.post(`/eventos/publicos/ticket/${codigo}/formulario`, { respuestas }).then(r => r.data),
   fichaExpositor      : (codigo)          => client.get(`/eventos/publicos/expositor/${codigo}`).then(r => r.data),
+  /* La rueda, del lado de quien participa: inscribirse con el código de su
+     boleta y ver después su agenda con el mismo código. */
+  inscribirRueda      : (slug, body)      => client.post(`/eventos/publicos/slug/${slug}/rueda/inscribir`, body).then(r => r.data),
+  agendaRueda         : (codigo)          => client.get(`/eventos/publicos/expositor/${encodeURIComponent(codigo)}/citas`).then(r => r.data),
   guardarFichaExpositor: (codigo, body)   => client.put(`/eventos/publicos/expositor/${codigo}`, body).then(r => r.data),
   torneoPublico: (slug) => client.get(`/eventos/publicos/slug/${slug}/torneo`).then(r => r.data),
   torneoPublicoUno: (slug, torneoId) => client.get(`/eventos/publicos/slug/${slug}/torneos/${torneoId}`).then(r => r.data),
