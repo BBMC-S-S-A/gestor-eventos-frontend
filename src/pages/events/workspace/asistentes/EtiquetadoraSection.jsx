@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { clientesApi } from '../../../../api/clientes.js';
 import ImprimirEtiquetas from '../../../../components/public/ImprimirEtiquetas.jsx';
 import EtiquetaTermica from '../../../../components/public/EtiquetaTermica.jsx';
@@ -61,17 +61,59 @@ export default function EtiquetadoraSection({ evento }) {
     [evento.page_json],
   );
 
-  useEffect(() => {
-    clientesApi.listarTodos(evento.id)
+  /* ── Que quien acaba de registrarse aparezca ──────────────────────────
+   *
+   * La lista se pedía UNA vez al abrir la pantalla. En la puerta de FESTECH
+   * eso significaba que quien se registraba en el momento no salía hasta
+   * recargar la pestaña entera —tres mil boletas, dieciséis peticiones— y
+   * mientras tanto se formaba la fila.
+   *
+   * Ahora hay dos caminos: la carga completa al abrir, y cada quince segundos
+   * una consulta pequeña de las 200 últimas que se mezcla con lo que ya hay.
+   * Lo nuevo entra arriba; lo que ya estaba no se vuelve a pedir. */
+  const traerTodo = useCallback(() => {
+    setLoading(true);
+    return clientesApi.listarTodos(evento.id)
       .then(d => setClientes(d.clientes || d.tickets || []))
       .finally(() => setLoading(false));
   }, [evento.id]);
 
-  const filas = useMemo(() => clientes.filter(c => {
-    if (!filtro) return true;
-    const t = `${c.guest_nombre || c.usuario?.nombre || ''} ${c.tipo?.nombre || ''}`.toLowerCase();
-    return t.includes(filtro.toLowerCase());
-  }), [clientes, filtro]);
+  useEffect(() => { traerTodo(); }, [traerTodo]);
+
+  useEffect(() => {
+    let vivo = true;
+    const mirarNuevos = () => {
+      clientesApi.list(evento.id, { limit: 200, page: 1, stats: 0 })
+        .then(d => {
+          if (!vivo) return;
+          const ultimos = d.clientes || [];
+          setClientes(previos => {
+            const conocidos = new Set(previos.map(c => c.id));
+            const nuevos = ultimos.filter(c => c?.id && !conocidos.has(c.id));
+            return nuevos.length ? [...nuevos, ...previos] : previos;
+          });
+        })
+        /* Un fallo aquí no puede vaciar la lista ni molestar: es un extra
+           sobre lo que ya está en pantalla. */
+        .catch(() => {});
+    };
+    const t = setInterval(mirarNuevos, 15000);
+    return () => { vivo = false; clearInterval(t); };
+  }, [evento.id]);
+
+  /* Busca por nombre, correo, código y tipo: en la puerta se busca por lo que
+     la persona dice o por lo que trae escrito, y quien está imprimiendo no
+     tiene por qué saber por cuál de los cuatro va a encontrarla. */
+  const filas = useMemo(() => {
+    const busca = filtro.trim().toLowerCase();
+    if (!busca) return clientes;
+    const palabras = busca.split(/\s+/).filter(Boolean);
+    return clientes.filter(c => {
+      const t = [c.guest_nombre, c.usuario?.nombre, c.guest_email, c.usuario?.email, c.codigo, c.tipo?.nombre]
+        .filter(Boolean).join(' ').toLowerCase();
+      return palabras.every(w => t.includes(w));
+    });
+  }, [clientes, filtro]);
 
   const etq = piezas.find(x => x.id === piezaId) || piezas[0];
 
@@ -112,7 +154,19 @@ export default function EtiquetadoraSection({ evento }) {
 
   const toggle = (id) => setSel(s => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const todos = () => setSel(s => s.size === filas.length ? new Set() : new Set(filas.map(f => f.id)));
-  const aImprimir = filas.filter(f => sel.size === 0 || sel.has(f.id));
+  /* ── Qué se imprime ───────────────────────────────────────────────────
+   *
+   * Antes: «nada seleccionado» significaba TODOS. En la puerta eso se vivía al
+   * revés de como se piensa —para imprimir una sola escarapela había que
+   * seleccionar todas y luego ir quitando— y con tres mil boletas delante es
+   * la diferencia entre una etiqueta y tres mil.
+   *
+   * Ahora manda lo seleccionado. Sin selección y con una búsqueda escrita, se
+   * imprime lo que la búsqueda dejó a la vista, que es lo que se está mirando;
+   * sin selección y sin búsqueda no se imprime nada, y el botón lo dice. */
+  const aImprimir = sel.size
+    ? filas.filter(f => sel.has(f.id))
+    : (filtro.trim() ? filas : []);
 
   /* Baja la vista previa como PNG, a la resolución exacta de la impresora.
    *
@@ -413,10 +467,15 @@ export default function EtiquetadoraSection({ evento }) {
       ) : (<>
         <div className="flex items-center justify-between gap-3 flex-wrap no-print">
           <div className="flex items-center gap-2">
-            <input className="input !h-9 w-64" placeholder="Filtrar por nombre o tipo…"
+            <input className="input !h-9 w-64" placeholder="Buscar por nombre, correo o código…"
               value={filtro} onChange={e => setFiltro(e.target.value)} />
             <button onClick={todos} className="btn-ghost btn-sm">
-              {sel.size === filas.length ? 'Quitar selección' : 'Seleccionar todos'}
+              {sel.size === filas.length && filas.length ? 'Quitar selección' : `Seleccionar ${filas.length}`}
+            </button>
+            {/* La lista se refresca sola cada quince segundos; esto es para
+                quien tiene a la persona delante y no quiere esperar. */}
+            <button onClick={traerTodo} disabled={loading} className="btn-ghost btn-sm">
+              {loading ? 'Actualizando…' : 'Actualizar'}
             </button>
           </div>
           <div className="flex items-center gap-2">
@@ -424,8 +483,10 @@ export default function EtiquetadoraSection({ evento }) {
               title="Genera un PNG por escarapela y lo manda a imprimir, en vez de mandar el HTML. Úsalo si el driver de la impresora reescala o corta la impresión normal.">
               {imprimiendoPng ? 'Generando…' : 'Imprimir por imagen (PNG)'}
             </button>
-            <button onClick={() => window.print()} disabled={!!problema} className="btn-primary btn-sm">
-              Imprimir {aImprimir.length} etiqueta{aImprimir.length !== 1 ? 's' : ''}
+            <button onClick={() => window.print()} disabled={!!problema || !aImprimir.length} className="btn-primary btn-sm">
+              {aImprimir.length
+                ? `Imprimir ${aImprimir.length} etiqueta${aImprimir.length !== 1 ? 's' : ''}`
+                : 'Elige a quién imprimir'}
             </button>
           </div>
         </div>
@@ -438,8 +499,9 @@ export default function EtiquetadoraSection({ evento }) {
           <ul className="divide-y divide-border">
             {filas.map(f => (
               <li key={f.id} className="flex items-center gap-3 px-4 py-2 hover:bg-surface-2/40 cursor-pointer" onClick={() => toggle(f.id)}>
-                <input type="checkbox" readOnly checked={sel.size === 0 || sel.has(f.id)} className="accent-[#8B5CF6]" />
+                <input type="checkbox" readOnly checked={sel.has(f.id)} className="accent-[#8B5CF6]" />
                 <span className="text-sm text-text-1 flex-1 truncate">{f.guest_nombre || f.usuario?.nombre || 'Asistente'}</span>
+                <span className="text-xs text-text-3 font-mono">{f.codigo || ''}</span>
                 <span className="text-xs text-text-3">{f.tipo?.nombre || 'General'}</span>
               </li>
             ))}

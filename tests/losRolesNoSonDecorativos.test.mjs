@@ -146,8 +146,14 @@ test('las seis pantallas que imprimen o facturan traen la lista entera', () => {
   /* Y el recorrido vive en un solo sitio, no seis veces. */
   const api = leer('api/clientes.js');
   assert.match(api, /listarTodos\s*:/);
-  assert.match(api, /tanda\.length < \(d\.por_pagina \?\? POR_TANDA\)/,
+  assert.match(api, /\w+\.length < \(d\.por_pagina \?\? POR_TANDA\)/,
     'el bucle se fía de lo que pidió en vez de lo que le dieron');
+  /* Y va por cursor, no por número de página: el día del evento entran boletas
+     mientras se recorren las tandas, y con páginas numeradas las filas se
+     desplazan — el mismo nombre sale dos veces y otro no sale. Visto en
+     FESTECH con tres mil boletas. */
+  assert.match(api, /proximo_cursor/, 'listarTodos volvió a paginar por número de página');
+  assert.match(api, /vistos\.has\(c\.id\)/, 'listarTodos ya no deduplica por id');
 });
 
 test('la agenda no se cae por lo que no se puede leer', () => {

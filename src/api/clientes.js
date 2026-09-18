@@ -19,21 +19,43 @@ export const clientesApi = {
    * con lo que se le pidio: un bucle que pide 500 y compara contra 500 para en
    * la primera tanda el dia que el tope baja. Eso ya paso una vez.
    *
-   * El tope de vueltas es un cinturon: 20 tandas son 4.000 boletas, y a partir
+   * El tope de vueltas es un cinturon: 60 tandas son 12.000 boletas, y a partir
    * de ahi lo que se quiere es la exportacion, que va por otro camino y sabe
-   * que va a tardar. */
+   * que va a tardar. FESTECH pasó de 1.375 boletas a 3.129 en un día, así que
+   * el cinturón de 20 se quedaba corto antes de lo que parecía.
+   *
+   * Va por CURSOR y no por número de página, y eso no es un detalle: el día
+   * del evento entran boletas mientras esto recorre las tandas. Con páginas
+   * numeradas, cada boleta nueva empuja a las demás hacia abajo y la última
+   * fila de una tanda reaparece al principio de la siguiente — en FESTECH se
+   * vio como el mismo nombre repetido seis veces, y gente que no salía al
+   * buscarla porque su fila se había caído entre dos tandas.
+   *
+   * El deduplicado por id se queda igual: es barato y es la única red si el
+   * servidor todavía no entiende `cursor` (un backend sin desplegar). */
   listarTodos  : async (eventoId, filtros = {}) => {
     const POR_TANDA = 200;
+    const vistos = new Set();
     const todos = [];
     let ultima = null;
-    for (let page = 1; page <= 20; page++) {
+    let cursor = null;
+    for (let tanda = 0; tanda < 60; tanda++) {
       const d = await client
-        .get(`/eventos/${eventoId}/clientes`, { params: { ...filtros, page, limit: POR_TANDA } })
+        .get(`/eventos/${eventoId}/clientes`, {
+          /* `stats: 0` en las tandas siguientes: el resumen recorre TODAS las
+             boletas del evento y basta con el de la primera. */
+          params: { ...filtros, limit: POR_TANDA, ...(cursor ? { cursor, stats: 0 } : { page: 1 }) },
+        })
         .then(r => r.data);
       ultima = d;
-      const tanda = d.clientes || [];
-      todos.push(...tanda);
-      if (tanda.length < (d.por_pagina ?? POR_TANDA)) break;
+      const lote = d.clientes || [];
+      for (const c of lote) {
+        if (c?.id && vistos.has(c.id)) continue;
+        if (c?.id) vistos.add(c.id);
+        todos.push(c);
+      }
+      cursor = d.proximo_cursor || null;
+      if (!cursor || lote.length < (d.por_pagina ?? POR_TANDA)) break;
     }
     /* Se devuelve con la forma de `list` —la misma respuesta, con la lista
        entera dentro— para que quien lo use no tenga que cambiar como lo lee.

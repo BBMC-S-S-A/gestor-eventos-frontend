@@ -243,7 +243,13 @@ export default function ClientesTab({ evento, puedeBorrar = false }) {
   };
 
   const clientes = data?.clientes || [];
-  const stats    = data?.stats    || { total: 0, ingresos: 0 };
+  /* El resumen se calcula recorriendo TODAS las boletas del evento, así que el
+     servidor sólo lo manda con la primera página (`stats: null` en las demás).
+     Se recuerda el último que llegó: si no, pasar a la página 2 dejaba las
+     cuatro tarjetas en cero, que es peor que un número de hace un momento. */
+  const statsVistas = useRef(null);
+  if (data?.stats) statsVistas.current = data.stats;
+  const stats    = data?.stats || statsVistas.current || { total: 0, ingresos: 0 };
   /* Los tipos de boleta llegan con la lista. Si el servidor es viejo y no los
      manda, el filtro no sale — y la lista funciona igual. */
   const tipos    = data?.tipos    || [];
