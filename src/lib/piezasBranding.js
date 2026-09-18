@@ -47,6 +47,11 @@ import { normalizarEtiqueta, medidas } from './etiquetaTermica.js';
 export const CONTENIDOS_QR = [
   { id: 'token',  label: 'Firma completa', pista: 'Lo más seguro. Necesita al menos 28 mm de alto libre.' },
   { id: 'codigo', label: 'Código corto',   pista: 'Cabe en casi nada. Es adivinable en bloque: conviene sólo donde el otro no entra.' },
+  /* El mismo papel, dos usos: el escáner del evento saca el código de la URL y
+     abre la puerta (`lib/qrEscaneado.js`), y la cámara de otro asistente abre
+     la tarjeta de contacto de esa persona. La tarjeta sólo enseña lo que ella
+     escribió y encendió a propósito — nunca las respuestas del registro. */
+  { id: 'contacto', label: 'Enlace de contacto', pista: 'Sirve en la puerta Y para presentarse: quien lo escanea con el móvil ve la tarjeta de contacto de esa persona, si ella la encendió.' },
 ];
 
 /* ── Cómo se imprime ese dato ──────────────────────────────────────────────
@@ -177,8 +182,12 @@ export function piezasDelEvento(evento) {
  *
  * Se cae al código corto si no hay token, que es lo que ya hacía antes: un
  * papel sin QR no sirve para nada, y el servidor acepta los dos. */
-export function valorQr(pieza, ticket = {}) {
+export function valorQr(pieza, ticket = {}, origen = null) {
   if (pieza?.qr_contenido === 'codigo') return ticket.codigo || ticket.qr_token || '';
+  if (pieza?.qr_contenido === 'contacto' && ticket.codigo) {
+    const base = origen || (typeof window !== 'undefined' ? window.location.origin : '');
+    return `${base}/p/${ticket.codigo}`;
+  }
   return ticket.qr_token || ticket.codigo || '';
 }
 
@@ -204,7 +213,14 @@ export function revisarPieza(pieza, muestra = 'x'.repeat(253)) {
     };
   }
 
-  const valor = p.qr_contenido === 'codigo' ? 'ABCD2345' : muestra;
+  /* Con qué se mide si cabe. El enlace de contacto es una URL de verdad —el
+     dominio del panel más el código—, y medirlo con el código corto diría que
+     cabe en piezas donde no entra. */
+  const valor = p.qr_contenido === 'codigo'
+    ? 'ABCD2345'
+    : p.qr_contenido === 'contacto'
+      ? `${typeof window !== 'undefined' ? window.location.origin : 'https://gestekeventost.dpdns.org'}/p/ABCD2345`
+      : muestra;
   const m = medidas(valor, p);
 
   /* El caso que hay que explicar y no sólo marcar en rojo: la manilla. Decir

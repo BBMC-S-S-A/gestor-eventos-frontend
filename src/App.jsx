@@ -25,6 +25,7 @@ const MapaPublicoPage    = lazy(() => import('./pages/public/MapaPublicoPage.jsx
 const AgendaPublicaPage  = lazy(() => import('./pages/public/AgendaPublicaPage.jsx'));
 const LegalEventoPage    = lazy(() => import('./pages/public/LegalEventoPage.jsx'));
 const MiTicketPage       = lazy(() => import('./pages/public/MiTicketPage.jsx'));
+const TarjetaContactoPage = lazy(() => import('./pages/public/TarjetaContactoPage.jsx'));
 const AcreditarPage      = lazy(() => import('./pages/public/AcreditarPage.jsx'));
 const VerificarBoletaPage = lazy(() => import('./pages/public/VerificarBoletaPage.jsx'));
 const AutorizarPage = lazy(() => import('./pages/conectar/AutorizarPage.jsx'));
@@ -120,6 +121,10 @@ export default function App() {
                     pueden leer no es aceptar nada. */}
                 <Route path="/explorar/:slug/legal"  element={<LegalEventoPage />} />
                 <Route path="/mi-ticket/:codigo" element={<MiTicketPage />} />
+                {/* La otra cara del QR de la escarapela: lo que ve quien lo
+                    escanea con la cámara del móvil. Ruta corta a propósito —
+                    va impresa dentro de un QR y cada carácter son módulos. */}
+                <Route path="/p/:codigo" element={<TarjetaContactoPage />} />
                 {/* Quién entra con esta boleta: los nombres de una mesa, o la
                     cuadrilla que monta un stand (0118/0127). Sin cuenta — esa
                     gente no tiene usuario en la plataforma. */}

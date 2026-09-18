@@ -285,6 +285,38 @@ export default function EtiquetadoraSection({ evento }) {
     }
   };
 
+  /* ── Reimprimir la de una persona ─────────────────────────────────────
+   *
+   * El caso es de la puerta del día 2: alguien vino ayer, hoy llega sin su
+   * escarapela y hay fila detrás. Antes había que dejarla seleccionada a ella
+   * sola, imprimir, y acordarse de deshacer la selección.
+   *
+   * `reimprimir: true` es a propósito: la hora y el nombre de quien la imprimió
+   * la PRIMERA vez no se pisan, así que después se puede ver quién pasó dos
+   * veces por el mostrador — que es justo lo que se mira cuando las escarapelas
+   * no cuadran con la gente que entró. */
+  const [reimprimiendo, setReimprimiendo] = useState(null);
+  const reimprimirUna = async (ticket) => {
+    setReimprimiendo(ticket.id);
+    try {
+      const generadas = await imprimirComoPng({
+        etiqueta: etq,
+        tickets: [ticket],
+        qrDe: (t) => valorQr(etq, t),
+        logoUrl: cfg.logo_url || '',
+        mostrarCodigo: cfg.mostrar?.codigo !== false,
+      });
+      if (!generadas) {
+        toastErr('No se pudo generar la escarapela — revisa que el navegador no haya bloqueado la ventana emergente.');
+        return;
+      }
+      await clientesApi.marcarImpresas(evento.id, [ticket.id], true);
+      success(`Reimpresa la de ${ticket.guest_nombre || ticket.usuario?.nombre || 'la persona'}.`);
+    } catch (e) {
+      toastErr(e.response?.data?.error || e.message);
+    } finally { setReimprimiendo(null); }
+  };
+
   const imprimirEnPapel = () => {
     const tanda = aImprimir;
     window.print();
@@ -596,6 +628,15 @@ export default function EtiquetadoraSection({ evento }) {
                   <span className="text-[10px] uppercase tracking-wide text-success border border-success/40 rounded-lg px-1.5 py-0.5">impresa</span>
                 )}
                 <span className="text-xs text-text-3">{f.tipo?.nombre || 'General'}</span>
+                {/* Reimprimir sin tocar la selección: quien llega sin su
+                    escarapela tiene a alguien detrás en la fila. */}
+                <button
+                  onClick={(e) => { e.stopPropagation(); reimprimirUna(f); }}
+                  disabled={!!problema || reimprimiendo === f.id}
+                  title="Volver a imprimir sólo esta escarapela"
+                  className="btn-ghost btn-sm !py-0.5 !px-2 text-[11px] flex-shrink-0">
+                  {reimprimiendo === f.id ? 'Generando…' : 'Reimprimir'}
+                </button>
               </li>
             ))}
           </ul>

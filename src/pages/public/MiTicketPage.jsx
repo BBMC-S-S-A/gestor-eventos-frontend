@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import TarjetaDeContacto from '../../components/public/TarjetaDeContacto.jsx';
 import Icono from '../../components/ui/Iconos.jsx';
 import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
@@ -189,6 +190,14 @@ export default function MiTicketPage() {
           <span className="text-accent-light text-sm font-medium whitespace-nowrap">Abrir</span>
         </Link>
       )}
+
+      {/* El otro uso del mismo QR: presentarse. Apagado mientras la persona no
+          lo encienda, y con campos propios — nunca lo del formulario. */}
+      <TarjetaDeContacto
+        codigo={ticket.codigo}
+        inicial={ticket.contacto || {}}
+        publicoInicial={ticket.contacto_publico}
+      />
 
       {/* Si es una boleta de stand, la empresa edita su ficha de expositor */}
       {ticket.tipo?.es_expositor && (
