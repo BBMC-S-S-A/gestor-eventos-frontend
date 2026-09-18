@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, Navigate } from 'react-router-dom';
 import { eventosApi } from '../../api/eventos.js';
 import GLoader from '../../components/ui/GLoader.jsx';
 import TarjetaContactoVista from '../../components/public/TarjetaContactoVista.jsx';
@@ -43,6 +43,14 @@ export default function TarjetaContactoPage() {
   }, [codigo]);
 
   if (cargando) return <div className="min-h-screen flex items-center justify-center"><GLoader /></div>;
+
+  /* Quien escanea con la cámara normal aterriza en la página de «conectar» del
+     evento: ve a esta persona, se la queda en su lista, y desde ahí puede
+     escanear a la siguiente sin volver a buscar ningún enlace. Sin evento
+     conocido (código que no existe) se queda aquí, diciendo qué pasó. */
+  if (datos?.evento?.slug) {
+    return <Navigate replace to={`/explorar/${datos.evento.slug}/conectar?c=${encodeURIComponent(codigo)}`} />;
+  }
 
   if (error) return (
     <Marco>

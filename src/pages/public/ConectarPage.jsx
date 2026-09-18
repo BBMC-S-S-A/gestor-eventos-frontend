@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useSearchParams } from 'react-router-dom';
 import { eventosApi } from '../../api/eventos.js';
 import QrScanner from '../../components/ui/QrScanner.jsx';
 import TarjetaContactoVista, { vcardDe, descargarVcf } from '../../components/public/TarjetaContactoVista.jsx';
@@ -36,6 +36,10 @@ function guardarConocidos(slug, lista) {
 
 export default function ConectarPage() {
   const { slug } = useParams();
+  /* `?c=CODIGO`: se llegó escaneando con la cámara normal un QR que lleva el
+     enlace `/p/CODIGO`. Esa persona se lee sola al entrar, y quien escaneó ya
+     está en la página desde la que puede seguir escaneando a los demás. */
+  const [params, setParams] = useSearchParams();
   const [titulo, setTitulo] = useState('');
   const [ultimo, setUltimo] = useState(null);   // { tarjeta } | { aviso } | { error }
   const [conocidos, setConocidos] = useState(() => leerConocidos(slug));
@@ -83,6 +87,20 @@ export default function ConectarPage() {
     }
   }, [slug, recordar]);
 
+  /* El código que trajo el enlace se lee una vez y se quita de la dirección:
+     recargar la página no tiene que volver a escanear a nadie. */
+  const leidoDelEnlace = useRef(false);
+  useEffect(() => {
+    const c = params.get('c');
+    if (!c || leidoDelEnlace.current) return;
+    leidoDelEnlace.current = true;
+    alLeer(c).finally(() => {
+      const resto = new URLSearchParams(params);
+      resto.delete('c');
+      setParams(resto, { replace: true });
+    });
+  }, [params, setParams, alLeer]);
+
   const guardarTodos = () => {
     if (!conocidos.length) return;
     descargarVcf(conocidos.map(c => vcardDe(c, titulo)).join('\n'), `contactos-${slug}`);
@@ -121,6 +139,10 @@ export default function ConectarPage() {
             que el evento comparte para el networking, y nada de quien prefirió no compartirlos.
           </p>
         </div>
+
+        {/* Lo último leído, también fuera de la cámara: quien llega por un
+            enlace todavía no la ha abierto, y es lo primero que tiene que ver. */}
+        {tarjetaFlotante}
 
         <QrScanner
           onScan={alLeer}
