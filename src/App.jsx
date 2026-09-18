@@ -18,6 +18,7 @@ const ExplorarPage       = lazy(() => import('./pages/public/ExplorarPage.jsx'))
 const EventoPublicoPage  = lazy(() => import('./pages/public/EventoPublicoPage.jsx'));
 const NetworkingPublicPage = lazy(() => import('./pages/public/NetworkingPublicPage.jsx'));
 const RuedaPublicaPage    = lazy(() => import('./pages/public/RuedaPublicaPage.jsx'));
+const RuedaInscripcionPage = lazy(() => import('./pages/public/RuedaInscripcionPage.jsx'));
 const TorneoPublicoPage  = lazy(() => import('./pages/public/TorneoPublicoPage.jsx'));
 const TorneosResumenPage = lazy(() => import('./pages/public/TorneosResumenPage.jsx'));
 const RankingPublicoPage = lazy(() => import('./pages/public/RankingPublicoPage.jsx'));
@@ -110,6 +111,8 @@ export default function App() {
                     tiene boleta reserva. Son dos públicos distintos y por eso
                     son dos rutas. */}
                 <Route path="/explorar/:slug/rueda" element={<RuedaPublicaPage />} />
+                {/* Inscribirse con el código de la boleta, y ver la agenda propia. */}
+                <Route path="/explorar/:slug/rueda/inscribirse" element={<RuedaInscripcionPage />} />
                 <Route path="/explorar/:slug/networking" element={<NetworkingPublicPage />} />
                 {/* «Escanea para conectar»: la cámara la abre esta página, así que
                     sirve con las escarapelas ya impresas, lleven el QR que lleven. */}

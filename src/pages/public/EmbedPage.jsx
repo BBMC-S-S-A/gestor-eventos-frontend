@@ -11,6 +11,7 @@ import { TarjetaTorneo } from './TorneosResumenPage.jsx';
 import { TablaRanking } from './RankingPublicoPage.jsx';
 import { EMBED_ALIAS, EMBED_SIN_CONFIG, avisarAlAnfitrion, estaIncrustado } from '../../lib/embed.js';
 import { ReservaModal, ConfirmacionModal } from './EventoPublicoPage.jsx';
+import RuedaInscripcionPage from './RuedaInscripcionPage.jsx';
 
 /* Secciones que no son bloques de la landing sino páginas propias del evento
    (llaves del torneo, agenda). También se pueden incrustar: leen el :slug de
@@ -44,6 +45,8 @@ const ESPECIALES = {
   torneos:   TorneosEmbed,
   campeones: TorneosEmbed,
   ranking:   RankingEmbed,
+  /* Inscripción a la rueda con el código de la boleta, y la agenda propia. */
+  'rueda-inscripcion': ({ evento }) => <RuedaInscripcionPage slug={evento.slug} />,
 };
 
 /* ──────────────────────────────────────────────────────────────────

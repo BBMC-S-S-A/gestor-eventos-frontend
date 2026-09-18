@@ -65,6 +65,7 @@ export const EMBED_ESPECIALES = [
   { seccion: 'directorio',  label: 'Directorio de expositores', nota: 'Las marcas del evento con su stand y su cronograma.' },
   { seccion: 'mapa-evento', label: 'Mapa del evento',       nota: 'El plano con los stands y las actividades ubicadas.' },
   { seccion: 'como-llegar', label: 'Cómo llegar',           nota: 'La dirección del evento sobre Google Maps.' },
+  { seccion: 'rueda-inscripcion', label: 'Inscripción a la rueda', nota: 'Con el código de su boleta, cada persona se inscribe como comprador o vendedor y ve sus citas.' },
   { seccion: 'boletas',     label: 'Boletas',               nota: 'Los tipos de entrada con su precio. Comprar abre GESTEK aparte.' },
 ];
 
