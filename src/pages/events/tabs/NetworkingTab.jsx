@@ -1146,8 +1146,20 @@ function AdminView({ evento }) {
           <p className="text-sm text-text-3">Aún no agregaste expositores. Crea el primero para empezar.</p>
         </div>
       ) : (
-        <div className="space-y-3">
-          {data.map(exp => (
+        /* En la rueda son dos papeles con nombre propio, y quien organiza
+           los cuenta por separado: cuántas mesas (compradores) y cuántos
+           visitan (vendedores). Una sola lista mezclada no lo dice. */
+        <div className="space-y-6">
+          {[
+            { rol: 'comprador', titulo: 'Compradores', vacio: 'Todavía no hay compradores.' },
+            { rol: 'vendedor',  titulo: 'Vendedores',  vacio: 'Todavía no hay vendedores.' },
+          ].map(grupo => {
+            const delGrupo = data.filter(e => (e.rol || 'comprador') === grupo.rol);
+            return (
+          <section key={grupo.rol} className="space-y-3">
+            <h3 className="text-sm font-semibold text-text-1">{grupo.titulo} <span className="text-text-3 font-normal">· {delGrupo.length}</span></h3>
+            {delGrupo.length === 0 && <p className="text-xs text-text-3">{grupo.vacio}</p>}
+          {delGrupo.map(exp => (
             <div key={exp.id} className="rounded-2xl border border-border bg-surface/40 p-4 space-y-3">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl overflow-hidden bg-gradient-to-br from-primary to-accent flex items-center justify-center text-white font-semibold flex-shrink-0">
@@ -1155,7 +1167,9 @@ function AdminView({ evento }) {
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-semibold text-text-1 truncate">{exp.nombre}</p>
-                  {exp.stand && <p className="text-xs text-text-3">Stand {numeroDeStand(exp.stand)}</p>}
+                  <p className="text-xs text-text-3 truncate">
+                    {[exp.stand && `Stand ${numeroDeStand(exp.stand)}`, exp.nit && `NIT ${exp.nit}`, exp.categoria_negocio].filter(Boolean).join(' · ')}
+                  </p>
                 </div>
                 <button onClick={() => setHorariosPara(exp)} className="btn-secondary btn-sm">+ Horarios</button>
                 <button onClick={() => setEditando(exp)} aria-label={`Editar a ${exp.nombre}`}
@@ -1187,6 +1201,9 @@ function AdminView({ evento }) {
               )}
             </div>
           ))}
+          </section>
+            );
+          })}
         </div>
       )}
 
@@ -1337,8 +1354,8 @@ function ExpositorModal({ eventoId, expositor, onClose, onDone, ocupados = [] })
             <label className="label">Su papel en la rueda</label>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { id: 'comprador', label: 'Recibe',  pista: 'Se sienta en una mesa y le llegan.' },
-                { id: 'vendedor',  label: 'Visita',  pista: 'Pasa por las mesas de otros.' },
+                { id: 'comprador', label: 'Comprador', pista: 'Se sienta en una mesa y los vendedores le llegan.' },
+                { id: 'vendedor',  label: 'Vendedor',  pista: 'Pasa por las mesas de los compradores.' },
               ].map(o => (
                 <button key={o.id} type="button" onClick={() => setRol(o.id)}
                   className={`text-left px-3 py-2 rounded-2xl border transition-colors ${
