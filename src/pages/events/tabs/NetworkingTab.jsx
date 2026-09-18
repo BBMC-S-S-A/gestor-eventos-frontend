@@ -9,6 +9,7 @@ import Spinner from '../../../components/ui/Spinner.jsx';
 import GLoader from '../../../components/ui/GLoader.jsx';
 import { numeroDeStand } from '../../../lib/expositoresUi.js';
 import ParrillaRueda from './ParrillaRueda.jsx';
+import ImportarRueda from './ImportarRueda.jsx';
 
 /* Tab Rueda de Negocios.
  *
@@ -1069,6 +1070,7 @@ function AdminView({ evento }) {
   /* `null` = cerrado, `'nuevo'` = alta, un expositor = edición. Un solo estado
      porque es un solo modal: dos banderas se desincronizan. */
   const [editando, setEditando] = useState(null);
+  const [importando, setImportando] = useState(false);
   const [horariosPara, setHorariosPara] = useState(null); // expositor seleccionado
   const { success, error: toastErr } = useToast();
 
@@ -1128,7 +1130,8 @@ function AdminView({ evento }) {
           entrando a la base. */}
       <ModoRueda evento={evento} />
 
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <button onClick={() => setImportando(true)} className="btn-secondary btn-sm">Subir Excel</button>
         <button onClick={() => setEditando('nuevo')} className="btn-gradient btn-sm">+ Agregar expositor</button>
       </div>
 
@@ -1205,6 +1208,11 @@ function AdminView({ evento }) {
             );
           })}
         </div>
+      )}
+
+      {importando && (
+        <ImportarRueda eventoId={evento.id} existentes={data || []}
+          onCerrar={() => setImportando(false)} onHecho={cargar} />
       )}
 
       {editando && (
