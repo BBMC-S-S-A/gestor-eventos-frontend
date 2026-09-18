@@ -1,5 +1,19 @@
 import client from './client.js';
 
+/* La página pública del evento la piden varias piezas a la vez al abrir
+   —la barra, la página, el mapa…— y cada una lanzaba su propia petición por
+   lo mismo. Se comparte la que está en vuelo y su respuesta durante 15 s; un
+   fallo no se guarda, así el siguiente intento vuelve a preguntar. */
+const EN_COMUN_MS = 15 * 1000;
+const enComun = new Map(); // clave → { promesa, hasta }
+function compartida(clave, pedir) {
+  const r = enComun.get(clave);
+  if (r && r.hasta > Date.now()) return r.promesa;
+  const promesa = pedir().catch((e) => { enComun.delete(clave); throw e; });
+  enComun.set(clave, { promesa, hasta: Date.now() + EN_COMUN_MS });
+  return promesa;
+}
+
 export const eventosApi = {
   /* Privadas (requieren login) */
   list      : (params = {}) => client.get('/eventos',           { params }).then(r => r.data),
@@ -27,9 +41,9 @@ export const eventosApi = {
      sección en vez de la landing entera. Sin ella, incrustar «Cómo llegar» en
      una web ajena metía en su DOM todos los demás bloques con su configuración.
      Ver `bloqueDeSeccion` en el backend. */
-  publicoBySlug: (slug, seccion) => client
+  publicoBySlug: (slug, seccion) => compartida(`${slug}|${seccion ?? ''}`, () => client
     .get(`/eventos/publicos/slug/${slug}`, seccion ? { params: { seccion } } : undefined)
-    .then(r => r.data),
+    .then(r => r.data)),
   /* Términos y privacidad PROPIOS del evento (migración 0059). El formulario
      de inscripción los enlaza siempre. */
   legalPublico : (slug)        => client.get(`/eventos/publicos/slug/${slug}/legal`).then(r => r.data),
