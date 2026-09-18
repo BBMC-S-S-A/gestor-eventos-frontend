@@ -13,6 +13,7 @@ import MedirConFoto from './MedirConFoto.jsx';
 import { impresionConfig } from '../../../../lib/wallet.js';
 import { descargarEtiquetaPng, imprimirComoPng } from '../../../../lib/etiquetaPng.js';
 import { qrPng } from '../../../../lib/qrPng.jsx';
+import { useSondeo } from '../../../../hooks/useSondeo.js';
 
 /* Asistentes · Imprimir en etiquetadora.
  *
@@ -85,12 +86,11 @@ export default function EtiquetadoraSection({ evento }) {
 
   useEffect(() => { traerTodo(); }, [traerTodo]);
 
-  useEffect(() => {
-    let vivo = true;
-    const mirarNuevos = () => {
+  /* Con `useSondeo` y no un setInterval pelado: una estación con la pestaña
+     de fondo no pide nada, y al volver a ella trae lo nuevo en el acto. */
+  const mirarNuevos = useCallback(() =>
       clientesApi.list(evento.id, { limit: 200, page: 1, stats: 0 })
         .then(d => {
-          if (!vivo) return;
           const ultimos = d.clientes || [];
           setClientes(previos => {
             const conocidos = new Set(previos.map(c => c.id));
@@ -100,15 +100,13 @@ export default function EtiquetadoraSection({ evento }) {
         })
         /* Un fallo aquí no puede vaciar la lista ni molestar: es un extra
            sobre lo que ya está en pantalla. */
-        .catch(() => {});
-    };
-    /* Cada minuto, y no cada quince segundos: son varias estaciones abiertas
+        .catch(() => {}),
+  [evento.id]);
+  /* Cada minuto, y no cada quince segundos: son varias estaciones abiertas
        todo el día contra el mismo servidor, y en la puerta lo que se nota es
        que la persona aparezca «enseguida», no que aparezca en quince
        segundos. El botón «Actualizar» está para quien no quiere esperar. */
-    const t = setInterval(mirarNuevos, 60000);
-    return () => { vivo = false; clearInterval(t); };
-  }, [evento.id]);
+  useSondeo(mirarNuevos, 60000);
 
   /* Busca por nombre, correo, código y tipo: en la puerta se busca por lo que
      la persona dice o por lo que trae escrito, y quien está imprimiendo no

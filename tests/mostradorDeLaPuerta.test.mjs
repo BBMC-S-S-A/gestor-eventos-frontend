@@ -23,8 +23,8 @@ const PANTALLA = leer('src/pages/events/workspace/asistentes/EtiquetadoraSection
 test('la lista se refresca sola, y cada minuto', () => {
   /* Cada quince segundos eran cuatro veces más peticiones desde cada estación
      abierta todo el día, y en la puerta no se nota la diferencia. */
-  assert.match(PANTALLA, /setInterval\(mirarNuevos, 60000\)/,
-    'el refresco automático cambió de ritmo: revisa que siga siendo un minuto');
+  assert.match(PANTALLA, /useSondeo\(mirarNuevos, 60000\)/,
+    'el refresco automático cambió de ritmo o dejó de pararse con la pestaña oculta: debe ser useSondeo a un minuto');
   assert.match(PANTALLA, /stats: 0/,
     'el refresco pide también el resumen, que recorre todas las boletas del evento');
 });
