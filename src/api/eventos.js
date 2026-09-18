@@ -50,6 +50,10 @@ export const eventosApi = {
      Sólo trae lo que esa persona escribió y encendió a propósito: nada del
      formulario de registro. */
   tarjetaContacto : (codigo)   => client.get(`/eventos/publicos/contacto/${codigo}`).then(r => r.data),
+  /* Lo que leyó la cámara en la página de «conectar» de un evento: el código,
+     la firma completa o el enlace impreso. El servidor lo entiende y lo acota
+     a ese evento. */
+  conectar : (slug, qr) => client.post(`/eventos/publicos/slug/${slug}/conectar`, { qr }).then(r => r.data),
   /* «No quiero que aparezcan mis datos». Sólo oculta o muestra: con los datos
      ocultos, el QR sigue sirviendo para entrar. */
   ocultarTarjetaContacto : (codigo, oculto) =>

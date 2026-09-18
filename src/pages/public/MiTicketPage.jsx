@@ -198,6 +198,7 @@ export default function MiTicketPage() {
         codigo={ticket.codigo}
         campos={ticket.tarjeta_contacto?.campos || []}
         ocultoInicial={ticket.tarjeta_contacto?.oculto}
+        slug={ticket.evento?.slug}
       />
 
       {/* Si es una boleta de stand, la empresa edita su ficha de expositor */}

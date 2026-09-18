@@ -16,7 +16,7 @@ import { useToast } from '../../context/ToastContext.jsx';
  *
  * Si el evento no comparte contactos, esta sección no sale.
  */
-export default function TarjetaDeContacto({ codigo, campos = [], ocultoInicial = false }) {
+export default function TarjetaDeContacto({ codigo, campos = [], ocultoInicial = false, slug = null }) {
   const { success, error: toastErr } = useToast();
   const [oculto, setOculto] = useState(Boolean(ocultoInicial));
   const [guardando, setGuardando] = useState(false);
@@ -57,12 +57,21 @@ export default function TarjetaDeContacto({ codigo, campos = [], ocultoInicial =
         No quiero que aparezcan mis datos al escanear mi QR
       </label>
 
-      {!oculto && (
-        <a href={`/p/${codigo}`} target="_blank" rel="noreferrer"
-          className="inline-block text-xs text-primary-light hover:underline mt-2">
-          Ver cómo te ven
-        </a>
-      )}
+      <div className="flex items-center gap-4 mt-2 flex-wrap">
+        {/* El otro lado: escanear a los demás. Desde esta página funciona con
+            cualquier escarapela, también con las ya impresas. */}
+        {slug && (
+          <a href={`/explorar/${slug}/conectar`} className="text-xs text-primary-light hover:underline font-medium">
+            Escanear a otros asistentes
+          </a>
+        )}
+        {!oculto && (
+          <a href={`/p/${codigo}`} target="_blank" rel="noreferrer"
+            className="text-xs text-text-3 hover:text-text-1">
+            Ver cómo te ven
+          </a>
+        )}
+      </div>
     </div>
   );
 }

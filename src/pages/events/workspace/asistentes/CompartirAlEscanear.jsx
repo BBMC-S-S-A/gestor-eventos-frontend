@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { eventosApi } from '../../../../api/eventos.js';
 import { useToast } from '../../../../context/ToastContext.jsx';
+import { qrPng } from '../../../../lib/qrPng.jsx';
 
 /* Carné · qué se ve al escanear el QR de alguien con el celular.
  *
@@ -54,6 +55,22 @@ export default function CompartirAlEscanear({ evento }) {
   };
 
   const sinGuardar = JSON.stringify([...elegidos].sort()) !== JSON.stringify([...guardado].sort());
+
+  /* La página donde la gente escanea para conectar. Es lo que hace servir las
+     escarapelas YA impresas: su QR no lleva un enlace, así que la cámara normal
+     no abre nada, pero esta página sí lo entiende. Para que la gente llegue,
+     un QR grande en un cartel o en la pantalla del evento. */
+  const urlConectar = `${window.location.origin}/explorar/${evento.slug}/conectar`;
+  const bajarCartel = () => {
+    const dataUrl = qrPng(urlConectar, 1200);
+    if (!dataUrl) { toastErr('No se pudo generar el QR.'); return; }
+    const a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = `conectar-${evento.slug}.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
 
   return (
     <div className="card">
@@ -109,6 +126,22 @@ export default function CompartirAlEscanear({ evento }) {
                   selección y todo lo que hable de identidad, salud o dirección quedaría a la vista de
                   cualquiera que le haga una foto a una escarapela.
                 </p>
+              </div>
+            )}
+
+            {guardado.length > 0 && (
+              <div className="rounded-2xl border border-border bg-surface-2/40 px-4 py-3 space-y-2">
+                <p className="text-xs text-text-2 leading-relaxed">
+                  <strong className="text-text-1">Para las escarapelas ya impresas:</strong> la cámara normal del
+                  celular no abre sus QR. Que la gente entre a esta página y escanee desde ahí — funciona con
+                  cualquier escarapela del evento.
+                </p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <a href={urlConectar} target="_blank" rel="noreferrer" className="text-xs text-primary-light hover:underline break-all">
+                    {urlConectar}
+                  </a>
+                  <button onClick={bajarCartel} className="btn-ghost btn-sm">Descargar QR para cartel</button>
+                </div>
               </div>
             )}
 

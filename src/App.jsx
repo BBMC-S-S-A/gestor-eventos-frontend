@@ -26,6 +26,7 @@ const AgendaPublicaPage  = lazy(() => import('./pages/public/AgendaPublicaPage.j
 const LegalEventoPage    = lazy(() => import('./pages/public/LegalEventoPage.jsx'));
 const MiTicketPage       = lazy(() => import('./pages/public/MiTicketPage.jsx'));
 const TarjetaContactoPage = lazy(() => import('./pages/public/TarjetaContactoPage.jsx'));
+const ConectarPage       = lazy(() => import('./pages/public/ConectarPage.jsx'));
 const AcreditarPage      = lazy(() => import('./pages/public/AcreditarPage.jsx'));
 const VerificarBoletaPage = lazy(() => import('./pages/public/VerificarBoletaPage.jsx'));
 const AutorizarPage = lazy(() => import('./pages/conectar/AutorizarPage.jsx'));
@@ -110,6 +111,9 @@ export default function App() {
                     son dos rutas. */}
                 <Route path="/explorar/:slug/rueda" element={<RuedaPublicaPage />} />
                 <Route path="/explorar/:slug/networking" element={<NetworkingPublicPage />} />
+                {/* «Escanea para conectar»: la cámara la abre esta página, así que
+                    sirve con las escarapelas ya impresas, lleven el QR que lleven. */}
+                <Route path="/explorar/:slug/conectar" element={<ConectarPage />} />
                 <Route path="/explorar/:slug/torneo" element={<TorneoPublicoPage />} />
                 <Route path="/explorar/:slug/torneos" element={<TorneosResumenPage />} />
                 <Route path="/explorar/:slug/ranking" element={<RankingPublicoPage />} />
