@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { UNIDADES_VIGENCIA, textoDuracion } from '../../../lib/vigenciaDuracion.js';
 import { ROLES, ORDEN_ROLES, rolValido } from '../../../lib/rolDeBoleta.js';
 import { confirmDialog } from '../../../components/ui/Confirm.jsx';
 import { ticketsApi } from '../../../api/tickets.js';
@@ -266,6 +267,9 @@ function TicketForm({ initial, eventoId, currency, onSubmit, onCancel }) {
        pide autorización y sale a la venta. */
     vigencia_desde       : toLocalInput(initial?.vigencia_desde),
     vigencia_hasta       : toLocalInput(initial?.vigencia_hasta),
+    /* 0136 · Duración desde el primer ingreso. Vacía = no caduca. */
+    vigencia_cantidad    : initial?.vigencia_cantidad ?? '',
+    vigencia_unidad      : initial?.vigencia_unidad || 'dias',
     requiere_autorizacion: Boolean(initial?.requiere_autorizacion),
     autoriza             : initial?.autoriza || 'evento',
     visible_publico      : initial?.visible_publico !== false,
@@ -387,6 +391,8 @@ function TicketForm({ initial, eventoId, currency, onSubmit, onCancel }) {
          cambiaron» dejaría un tipo a medio configurar sin que se notara. */
       vigencia_desde       : form.vigencia_desde ? new Date(form.vigencia_desde).toISOString() : null,
       vigencia_hasta       : form.vigencia_hasta ? new Date(form.vigencia_hasta).toISOString() : null,
+      vigencia_cantidad    : Number(form.vigencia_cantidad) > 0 ? Math.floor(Number(form.vigencia_cantidad)) : null,
+      vigencia_unidad      : Number(form.vigencia_cantidad) > 0 ? form.vigencia_unidad : null,
       requiere_autorizacion: form.requiere_autorizacion,
       autoriza             : form.autoriza,
       visible_publico      : form.visible_publico,
@@ -641,6 +647,35 @@ function TicketForm({ initial, eventoId, currency, onSubmit, onCancel }) {
               className="input-form bg-surface-2"
             />
             <p className="text-[11px] text-text-3 mt-1.5">Después de esta fecha no se podrán comprar más boletas de este tipo.</p>
+          </div>
+
+          {/* ── Vigencia por duración (0136) ───────────────────────────────
+              Un pase de «1 día» en un evento de tres, o de «4 horas» en una
+              feria. Corre desde que la persona entra por primera vez. */}
+          <div className="pt-4 mt-2 border-t border-border space-y-3">
+            <div>
+              <p className="text-sm font-medium text-text-1">Vigencia</p>
+              <p className="text-[11px] text-text-3 mt-0.5">
+                Cuánto dura la boleta desde que la persona entra por primera vez. Vacío = vale todo el evento.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-text-2">Válida por</span>
+              <input type="number" min="1" step="1" value={form.vigencia_cantidad}
+                onChange={e => update('vigencia_cantidad', e.target.value)}
+                className="input-form bg-surface-2 w-24" placeholder="—" />
+              <select value={form.vigencia_unidad} onChange={e => update('vigencia_unidad', e.target.value)}
+                className="input-form bg-surface-2 w-auto">
+                {UNIDADES_VIGENCIA.map(u => <option key={u.id} value={u.id}>{u.varios}</option>)}
+              </select>
+            </div>
+            {Number(form.vigencia_cantidad) > 0 && (
+              <p className="text-[11px] text-text-3">
+                {form.vigencia_unidad === 'horas'
+                  ? `Vale ${textoDuracion(form.vigencia_cantidad, 'horas')} exactas desde que entra.`
+                  : `Días de calendario en la hora del evento: si entra el día 1, ${Number(form.vigencia_cantidad) * (form.vigencia_unidad === 'semanas' ? 7 : 1) === 1 ? 'vale hasta que termine ese día' : `vale hasta que termine el día ${Number(form.vigencia_cantidad) * (form.vigencia_unidad === 'semanas' ? 7 : 1)}`}.`}
+              </p>
+            )}
           </div>
 
           {/* ── La credencial (0127/0128) ──────────────────────────────────

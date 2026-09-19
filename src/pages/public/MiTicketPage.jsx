@@ -14,6 +14,7 @@ import { googleCalendarUrl } from '../../lib/calendario.js';
 import DescargarEntrada from '../../components/public/DescargarEntrada.jsx';
 import Volver from '../../components/ui/Volver.jsx';
 import { mensajePublico } from '../../lib/mensajeDeError.js';
+import { textoVence, textoQueda } from '../../lib/vigenciaDuracion.js';
 
 /* Página pública /mi-ticket/:codigo
    Cualquiera con el código puede ver su QR. */
@@ -282,6 +283,17 @@ export default function MiTicketPage() {
         <Row label="Asistente" value={ticket.guest_nombre} />
         <Row label="Email" value={ticket.guest_email} />
         <Row label="Tipo de boleta" value={ticket.tipo?.nombre} />
+        {/* Pase con duración (0136). Antes de entrar sólo se dice cuánto
+            dura: todavía no corre. Después, hasta cuándo vale. */}
+        {ticket.vigencia && (
+          <Row label="Vigencia" value={
+            !ticket.vigencia.vence_at
+              ? `${ticket.vigencia.duracion} desde tu primer ingreso`
+              : new Date(ticket.vigencia.vence_at).getTime() <= Date.now()
+                ? `Venció el ${textoVence(ticket.vigencia.vence_at, ticket.evento?.timezone)}`
+                : `Hasta ${textoVence(ticket.vigencia.vence_at, ticket.evento?.timezone)}${textoQueda(ticket.vigencia.vence_at) ? ` · ${textoQueda(ticket.vigencia.vence_at)}` : ''}`
+          } />
+        )}
         {fecha && <Row label="Fecha" value={fecha} />}
         {ticket.evento?.location_nombre && <Row label="Lugar" value={ticket.evento.location_nombre} />}
         {/* El enlace del evento en línea.
