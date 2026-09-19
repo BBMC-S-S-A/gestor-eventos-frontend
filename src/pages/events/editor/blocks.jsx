@@ -4,6 +4,7 @@
    Cada uno expone: label, icon, defaults, Editor, Preview, category. */
 
 import { useState, useEffect, lazy, Suspense } from 'react';
+import { textoDuracion } from '../../../lib/vigenciaDuracion.js';
 import { numeroDeStand } from '../../../lib/expositoresUi.js';
 import { agruparBoletas } from '../../../lib/rolDeBoleta.js';
 import { Seccion, ControlesPresentacion, Grupo, Opciones, Interruptor } from './presentacion.jsx';
@@ -695,6 +696,10 @@ function TarjetaBoleta({ t, evento, aforoLleno, data, onReservar, onWaitlist }) 
             {hasEarly && !ventaCerr && <span className="text-[9px] uppercase tracking-widest text-warning font-semibold">Early</span>}
           </div>
           {t.descripcion && <p className="text-[11px] text-text-3 mt-0.5">{t.descripcion}</p>}
+          {/* Pase con duración (0136): quien compra tiene que saberlo antes. */}
+          {textoDuracion(t.vigencia_cantidad, t.vigencia_unidad) && (
+            <p className="text-[11px] text-text-2 mt-0.5">Válida {textoDuracion(t.vigencia_cantidad, t.vigencia_unidad)} desde tu primer ingreso</p>
+          )}
           {avisos.length > 0 && (
             <p className="text-[11px] text-warning mt-1 leading-snug">{avisos.join(' · ')}</p>
           )}

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { textoVence, textoQueda } from '../../../lib/vigenciaDuracion.js';
 import QrScanner from '../../../components/ui/QrScanner.jsx';
 import { clientesApi } from '../../../api/clientes.js';
 import { agendaApi } from '../../../api/agenda.js';
@@ -1038,7 +1039,9 @@ function ResultadoCard({ result, compact }) {
     ? '¡Bienvenido!'
     : yaUsada
       ? 'Boleta ya usada'
-      : 'Boleta no válida';
+      : result.vencida
+        ? 'Boleta vencida'
+        : 'Boleta no válida';
 
   const ticket = result.ticket;
 
@@ -1057,6 +1060,16 @@ function ResultadoCard({ result, compact }) {
             <div className="mt-3 space-y-1">
               <p className="text-base font-medium text-text-1">{ticket.guest_nombre || ticket.guest_email || 'Asistente'}</p>
               <p className="text-xs text-text-3">{ticket.tipo?.nombre || ticket.rol} · <span className="font-mono">{ticket.codigo}</span></p>
+              {/* Pase con duración (0136): cuánto le queda, o cuándo venció. */}
+              {ok && result.vigencia?.vence_at && (
+                <p className="text-xs text-text-2 mt-2">
+                  Pase de {result.vigencia.duracion} · vale hasta {textoVence(result.vigencia.vence_at)}
+                  {textoQueda(result.vigencia.vence_at) && ` (${textoQueda(result.vigencia.vence_at)})`}
+                </p>
+              )}
+              {result.vencida && result.vence_at && (
+                <p className="text-xs text-text-3 mt-2">Venció el {textoVence(result.vence_at)}</p>
+              )}
               {yaUsada && result.checked_in_at && (
                 <p className="text-xs text-text-3 mt-2">Entrada registrada el {new Date(result.checked_in_at).toLocaleString('es-CO')}</p>
               )}
