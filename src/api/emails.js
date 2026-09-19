@@ -66,4 +66,9 @@ export const emailsApi = {
     client.get(`/eventos/${eventoId}/emails/cola`).then(r => r.data),
   reintentarCola: (eventoId) =>
     client.post(`/eventos/${eventoId}/emails/cola/reintentar`).then(r => r.data),
+  /* Boletas que nunca recibieron su correo, y encolarlas todas. */
+  sinBoleta: (eventoId) =>
+    client.get(`/eventos/${eventoId}/emails/sin-boleta`).then(r => r.data),
+  enviarSinBoleta: (eventoId) =>
+    client.post(`/eventos/${eventoId}/emails/sin-boleta/enviar`).then(r => r.data),
 };

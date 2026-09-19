@@ -5,6 +5,7 @@ import { emailsApi } from '../../../../api/emails.js';
 import { useToast } from '../../../../context/ToastContext.jsx';
 import ImagePicker from '../../../../components/ui/ImagePicker.jsx';
 import BuzonPropio from './BuzonPropio.jsx';
+import BoletasSinCorreo from './BoletasSinCorreo.jsx';
 import EstadoCola from './EstadoCola.jsx';
 import { confirmDialog } from '../../../../components/ui/Confirm.jsx';
 
@@ -272,6 +273,7 @@ export default function EmailsSection({ evento, reload }) {
 
     {/* Justo debajo del buzón: quien viene aquí porque «a fulano no le llegó»
         encuentra la respuesta antes de ponerse a revisar plantillas. */}
+    <BoletasSinCorreo evento={evento} />
     <EstadoCola evento={evento} />
 
     <div className="grid lg:grid-cols-[240px_1fr_340px] gap-5 items-start">
