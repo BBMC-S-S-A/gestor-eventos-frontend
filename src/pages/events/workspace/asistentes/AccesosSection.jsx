@@ -6,6 +6,7 @@ import { clientesApi } from '../../../../api/clientes.js';
 import { equipoApi } from '../../../../api/equipo.js';
 import { useToast } from '../../../../context/ToastContext.jsx';
 import GLoader from '../../../../components/ui/GLoader.jsx';
+import RechazosPuerta from './RechazosPuerta.jsx';
 import { useSondeo } from '../../../../hooks/useSondeo.js';
 import { zonasDelEvento, etiquetaZona } from '../../../../lib/zonas.js';
 import { miembrosDelEvento } from '../../../../lib/equipo.js';
@@ -216,6 +217,9 @@ export default function AccesosSection({ evento }) {
           </ul>
         )}
       </div>
+
+      {/* ── Rechazos de la puerta (0135) ── */}
+      <RechazosPuerta eventoId={evento.id} />
 
       {/* Tablero de ingresos por puerta */}
       {Object.keys(conteo).length > 0 && (
