@@ -89,12 +89,31 @@ export default function CheckinTab({ evento, miRolId = null, miUserId = null, pe
     return ids;
   }, [accesos, miUserId, miRolId]);
 
-  /* Si sólo tienes una y todavía no elegiste ninguna, se elige sola. Quien está
-     en la puerta abre esto con cola delante; un desplegable menos que tocar. */
+  /* Si no hay nada que elegir, se elige solo. Son dos casos y antes sólo se
+     cubría el segundo:
+
+       · el evento tiene UNA puerta — entonces no es una pregunta, es un dato;
+       · o tú tienes una sola asignada, que es tu sitio.
+
+     El primero faltaba y costó caro. En FESTECH IBAGUÉ había cuatro puertas y
+     el rol de puerta estaba asignado a las cuatro, así que `misPuertas` valía
+     4, la elección automática no entraba nunca, y el desplegable se quedaba en
+     «Sin especificar» en todos los móviles. Resultado: 3.182 de 3.334 ingresos
+     sin puerta —el 95%—, y un informe que puede decir a qué hora se congestionó
+     el evento pero no dónde. El dato no se perdió: no se llegó a tomar. */
   useEffect(() => {
-    if (puertaId || misPuertas.size !== 1) return;
-    elegirPuerta([...misPuertas][0]);
-  }, [misPuertas, puertaId]);
+    if (puertaId) return;
+    if (accesos.length === 1) { elegirPuerta(accesos[0].id); return; }
+    if (misPuertas.size === 1) elegirPuerta([...misPuertas][0]);
+    /* eslint-disable-next-line */
+  }, [accesos.length, misPuertas, puertaId]);
+
+  /* Descartar la pregunta dura lo que dure la pestaña abierta, a propósito. Es
+     un tap y se hace una vez por turno; si alguien la quita porque tiene diez
+     personas delante, vuelve a la siguiente vez que abra el escáner. Lo que no
+     hace nunca es impedir escanear: una puerta que no deja pasar a nadie por
+     un desplegable es peor que una puerta sin estadística. */
+  const [preguntaPuertaOculta, setPreguntaPuertaOculta] = useState(false);
 
   const puertaRef = useRef(puertaId);
   const elegirPuerta = (id) => {
@@ -639,23 +658,53 @@ export default function CheckinTab({ evento, miRolId = null, miUserId = null, pe
           <h2 className="text-2xl font-bold font-display text-text-1 tracking-tight">Check-in</h2>
           <p className="text-sm text-text-2 mt-1">Escanea el QR de cada asistente o ingresa el código manualmente.</p>
           {accesos.length > 0 && (
-            <div className="flex items-center gap-2 mt-2">
-              <span className="text-xs text-text-3">Tu puerta:</span>
-              <select value={puertaId} onChange={e => elegirPuerta(e.target.value)}
-                className="input !h-8 !py-1 text-sm w-auto">
-                <option value="">Sin especificar</option>
-                {misPuertas.size > 0 && (
-                  <optgroup label="Asignadas a ti">
-                    {accesos.filter(a => misPuertas.has(a.id))
+            !puertaId && !preguntaPuertaOculta ? (
+              /* Sin puerta elegida la pregunta se hace ENTERA y con botones, no
+                 escondida en un desplegable que dice «Sin especificar» — que se
+                 lee como un valor válido y no como algo que falta. Las tuyas
+                 primero: en un cambio de turno se toca la primera y ya. */
+              <div className="mt-2 rounded-xl border border-warning/40 bg-warning/10 px-3 py-2.5 max-w-lg">
+                <p className="text-sm font-semibold text-text-1">¿En qué puerta estás?</p>
+                <p className="text-xs text-text-2 mt-0.5 mb-2">
+                  Se pregunta una vez y este móvil la recuerda. Sin esto, el informe del evento no puede
+                  decir por dónde entró la gente.
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[...accesos].sort((a, b) => (misPuertas.has(b.id) ? 1 : 0) - (misPuertas.has(a.id) ? 1 : 0))
+                    .map(a => (
+                      <button key={a.id} onClick={() => elegirPuerta(a.id)}
+                        className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors ${
+                          misPuertas.has(a.id)
+                            ? 'border-primary/50 bg-primary/10 text-text-1 hover:bg-primary/20'
+                            : 'border-border bg-surface-2 text-text-2 hover:text-text-1'}`}>
+                        {a.nombre}
+                      </button>
+                    ))}
+                  <button onClick={() => setPreguntaPuertaOculta(true)}
+                    className="px-3 py-1.5 rounded-lg text-sm text-text-3 hover:text-text-2">
+                    Ahora no
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 mt-2">
+                <span className="text-xs text-text-3">Tu puerta:</span>
+                <select value={puertaId} onChange={e => elegirPuerta(e.target.value)}
+                  className="input !h-8 !py-1 text-sm w-auto">
+                  <option value="">Sin especificar</option>
+                  {misPuertas.size > 0 && (
+                    <optgroup label="Asignadas a ti">
+                      {accesos.filter(a => misPuertas.has(a.id))
+                        .map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
+                    </optgroup>
+                  )}
+                  <optgroup label={misPuertas.size > 0 ? 'Las demás' : 'Puertas'}>
+                    {accesos.filter(a => !misPuertas.has(a.id))
                       .map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
                   </optgroup>
-                )}
-                <optgroup label={misPuertas.size > 0 ? 'Las demás' : 'Puertas'}>
-                  {accesos.filter(a => !misPuertas.has(a.id))
-                    .map(a => <option key={a.id} value={a.id}>{a.nombre}</option>)}
-                </optgroup>
-              </select>
-            </div>
+                </select>
+              </div>
+            )
           )}
         </div>
         <div className="flex items-center gap-3 flex-wrap">

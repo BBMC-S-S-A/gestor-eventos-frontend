@@ -49,9 +49,22 @@ export default function ResumenSection({ evento, soyOwner, onEditar, onAnuncio, 
     return lista;
   }, [equipo]);
 
-  const { ingresados } = useAsistenciaEnVivo(evento.id);
+  const { ingresados, total: boletasReales } = useAsistenciaEnVivo(evento.id);
 
-  const pct = evento.aforo_total > 0 ? Math.min(100, Math.round((evento.aforo_vendido || 0) / evento.aforo_total * 100)) : null;
+  /* Las boletas vendidas, contando filas y no leyendo el contador.
+   *
+   * `evento.aforo_vendido` es una columna denormalizada que el backend lleva a
+   * mano —no hay disparador que la mantenga— y se queda corta: en FESTECH
+   * IBAGUÉ marcaba 4.273 con 4.485 boletas emitidas, y el desfase crece
+   * mientras el evento vende. Esta pantalla es la primera que se abre por la
+   * mañana, así que era el número equivocado en el sitio más visible.
+   *
+   * `total` sale de la misma petición que ya hace el contador de ingresos justo
+   * encima, así que no cuesta una llamada más. `aforo_vendido` queda de
+   * respaldo para el primer pintado, antes de que la lista conteste. */
+  const vendidas = boletasReales ?? evento.aforo_vendido ?? 0;
+
+  const pct = evento.aforo_total > 0 ? Math.min(100, Math.round(vendidas / evento.aforo_total * 100)) : null;
   const diasRestantes = evento.fecha_inicio
     ? Math.ceil((new Date(evento.fecha_inicio) - new Date()) / 86400000)
     : null;
@@ -136,8 +149,8 @@ export default function ResumenSection({ evento, soyOwner, onEditar, onAnuncio, 
 
       {/* ── KPIs ── */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
-        <Kpi label={t('Boletas vendidas')} valor={(evento.aforo_vendido || 0).toLocaleString(lang === 'en' ? 'en-US' : 'es-CO')} />
-        <Kpi label={t('Aforo')} valor={pct !== null ? `${pct}%` : t('Sin tope')} sub={evento.aforo_total ? `${evento.aforo_vendido || 0} / ${evento.aforo_total}` : null} />
+        <Kpi label={t('Boletas vendidas')} valor={vendidas.toLocaleString(lang === 'en' ? 'en-US' : 'es-CO')} />
+        <Kpi label={t('Aforo')} valor={pct !== null ? `${pct}%` : t('Sin tope')} sub={evento.aforo_total ? `${vendidas} / ${evento.aforo_total}` : null} />
         <Kpi label={t('En el evento ahora')} valor={ingresados ?? 0} />
         <Kpi label={t('Tareas abiertas')} valor={tareas.filter(x => x.estado !== 'hecho').length} alerta={vencidas.length > 0 ? t('{n} vencidas', { n: vencidas.length }) : null} />
         <Kpi label={diasRestantes !== null && diasRestantes >= 0 ? t('Días para el evento') : t('Estado')} valor={diasRestantes !== null && diasRestantes >= 0 ? diasRestantes : (evento.estado || '—')} />

@@ -321,7 +321,7 @@ export default function ClientesTab({ evento, puedeBorrar = false }) {
           <SearchIcon className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-text-3 pointer-events-none" />
           <input
             value={q} onChange={e => filtrar(() => setQ(e.target.value))}
-            placeholder="Nombre, correo o código de boleta…"
+            placeholder="Nombre, cédula, correo o código…"
             className="input rounded-2xl py-2.5 pl-10 text-sm"
           />
         </div>

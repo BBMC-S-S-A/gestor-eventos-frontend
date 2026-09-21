@@ -4,6 +4,8 @@ import { tareasApi } from '../../../api/tareas.js';
 import { interaccionesApi } from '../../../api/interacciones.js';
 import { vacantesApi } from '../../../api/vacantes.js';
 import { useAsistenciaEnVivo } from '../../../hooks/useAsistenciaEnVivo.js';
+import { clientesApi } from '../../../api/clientes.js';
+import { normalizarBoletas, resumenPorDia } from '../../../lib/ingresosPorHora.js';
 import GLoader from '../../../components/ui/GLoader.jsx';
 
 /* Reporte post-evento — consolida en una sola hoja (imprimible / PDF) lo que
@@ -12,9 +14,26 @@ import GLoader from '../../../components/ui/GLoader.jsx';
 
 const money = (n, cur = 'COP') => `$${Math.round(Number(n) || 0).toLocaleString('es-CO')}${cur && cur !== 'COP' ? ' ' + cur : ''}`;
 
+/* El día, en la forma corta que cabe en una tabla impresa. */
+const DIA_CORTO = (d) => d.toLocaleDateString('es-CO', { weekday: 'short', day: '2-digit', month: 'short' });
+const HORA      = (d) => (d ? d.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' }) : '—');
+
 export default function ReporteTab({ evento }) {
   const [data, setData] = useState(null);
-  const { ingresados } = useAsistenciaEnVivo(evento.id);
+  /* Cómo entró la gente, por día. Va en su propia petición y en su propio
+     estado —y no dentro del `Promise.all` de arriba— porque recorre TODAS las
+     boletas del evento: son ~25 llamadas para un evento de 4.500. Metido en el
+     bloque principal, el reporte entero se quedaría en «Reuniendo…» esperando
+     a un bloque que es el último de la hoja. Así el resto se pinta enseguida y
+     este aparece cuando está.
+
+     Franja de 60 minutos: es un papel. El detalle de cinco minutos vive en
+     «Ingresos por hora», que es donde se va a mirar de verdad. */
+  const [puerta, setPuerta] = useState(null);
+  /* `total` es el conteo que el servidor hace recorriendo TODAS las boletas del
+     evento — el mismo que enseña la pestaña Clientes. Viene en esta misma
+     petición, así que traerlo no cuesta nada. Ver `vendidas` más abajo. */
+  const { ingresados, total: boletasReales } = useAsistenciaEnVivo(evento.id);
 
   useEffect(() => {
     let vivo = true;
@@ -30,6 +49,17 @@ export default function ReporteTab({ evento }) {
     return () => { vivo = false; };
   }, [evento.id]);
 
+  useEffect(() => {
+    let vivo = true;
+    clientesApi.listarTodos(evento.id)
+      .then(d => { if (vivo) setPuerta(resumenPorDia(normalizarBoletas(d.clientes || []), 60)); })
+      /* Si falla, el bloque no sale y el resto del reporte se entrega igual.
+         Un reporte sin la tabla de la puerta sigue sirviendo; uno que no se
+         pinta por culpa de esa tabla, no. */
+      .catch(() => { if (vivo) setPuerta([]); });
+    return () => { vivo = false; };
+  }, [evento.id]);
+
   if (!data) return <GLoader message="Reuniendo el reporte…" />;
 
   const r = data.an?.resumen || {};
@@ -39,7 +69,25 @@ export default function ReporteTab({ evento }) {
      nunca. No fallaba nada: sencillamente no estaba, que es peor de encontrar. */
   const ventas = data.an?.ventas_por_tipo || data.an?.ventas || [];
   const part = data.an?.participacion || { sub_eventos: [], torneos: [] };
-  const pctAforo = evento.aforo_total > 0 ? Math.round((evento.aforo_vendido || 0) / evento.aforo_total * 100) : null;
+  /* Cuántas boletas se vendieron, de verdad.
+   *
+   * Aquí ponía `evento.aforo_vendido`, que es una columna denormalizada que el
+   * backend lleva a mano —no hay disparador que la mantenga— y que se actualiza
+   * en unos caminos de creación de boleta y en otros no. Se queda corta, y el
+   * desfase CRECE con el evento: en FESTECH IBAGUÉ marcaba 4.273 cuando había
+   * 4.485 boletas. Doscientas doce personas que el reporte no le contaba al
+   * cliente.
+   *
+   * Y peor que estar mal: estaba mal SÓLO AQUÍ. La pestaña Clientes cuenta las
+   * filas y decía 4.485; este reporte decía 4.273. El mismo evento con dos
+   * números, y el que se imprime y se entrega era el bajo. Se reportó como
+   * «había 4.150 y al actualizar había 4.090»: no faltaban boletas, sobraban
+   * contadores.
+   *
+   * Se prefiere el conteo real y `aforo_vendido` queda de respaldo, para una
+   * pantalla que cargue antes de que llegue la lista. */
+  const vendidas = boletasReales ?? evento.aforo_vendido ?? 0;
+  const pctAforo = evento.aforo_total > 0 ? Math.round(vendidas / evento.aforo_total * 100) : null;
   const tareasHechas = data.tareas.filter(t => t.estado === 'hecho').length;
   const puntosExpo = data.ranking.reduce((a, e) => a + (e.puntos || 0), 0);
   const contratados = data.vacantes.reduce((a, v) => a + (v.postulaciones?.aceptado || 0), 0);
@@ -47,8 +95,8 @@ export default function ReporteTab({ evento }) {
   const hoy = new Date().toLocaleDateString('es-CO', { day: '2-digit', month: 'long', year: 'numeric' });
 
   const KPIS = [
-    { label: 'Boletas vendidas', v: (evento.aforo_vendido || 0).toLocaleString('es-CO') },
-    { label: 'Aforo', v: pctAforo != null ? `${pctAforo}%` : '—', sub: evento.aforo_total ? `${evento.aforo_vendido || 0}/${evento.aforo_total}` : null },
+    { label: 'Boletas vendidas', v: vendidas.toLocaleString('es-CO') },
+    { label: 'Aforo', v: pctAforo != null ? `${pctAforo}%` : '—', sub: evento.aforo_total ? `${vendidas}/${evento.aforo_total}` : null },
     { label: 'Ingresos', v: money(r.ingresos, evento.currency) },
     { label: 'Asistieron (check-in)', v: (ingresados ?? 0).toLocaleString('es-CO') },
     { label: 'Puntos en stands', v: puntosExpo.toLocaleString('es-CO') },
@@ -132,6 +180,60 @@ export default function ReporteTab({ evento }) {
               </tbody>
             </table>
             </div>
+          </Bloque>
+        )}
+
+        {/* Cómo entró la gente.
+
+            El resto del reporte cuenta CUÁNTOS; esto cuenta CUÁNDO, que es lo
+            que sirve para montar el año que viene. «En la puerta» son los que
+            se registraron a menos de quince minutos de entrar: es la columna
+            que explica la cola, porque un QR se escanea en tres segundos y un
+            formulario de pie se rellena en tres minutos. */}
+        {puerta?.length > 0 && (
+          <Bloque titulo="Cómo entró la gente">
+            <div className="overflow-x-auto -mx-1 px-1">
+            <table className="w-full text-sm min-w-[460px]">
+              <thead>
+                <tr className="text-[10px] uppercase tracking-widest text-text-3">
+                  <th className="text-left font-semibold pb-2">Día</th>
+                  <th className="text-right font-semibold pb-2">Entradas</th>
+                  <th className="text-right font-semibold pb-2">Horario</th>
+                  <th className="text-right font-semibold pb-2">Hora pico</th>
+                  <th className="text-right font-semibold pb-2">En la puerta</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {puerta.map(d => (
+                  <tr key={d.fecha.toDateString()}>
+                    <td className="py-2 text-text-2 capitalize">{DIA_CORTO(d.fecha)}</td>
+                    <td className="py-2 text-right text-text-1 font-semibold tabular-nums">
+                      {d.ingresos.toLocaleString('es-CO')}
+                      {d.reingresos > 0 && (
+                        <span className="ml-1.5 text-[11px] text-text-3 font-normal">+{d.reingresos} volvieron</span>
+                      )}
+                    </td>
+                    <td className="py-2 text-right text-text-3 tabular-nums">{HORA(d.primera)}–{HORA(d.ultima)}</td>
+                    <td className="py-2 text-right text-text-2 tabular-nums">
+                      {d.pico ? <>{HORA(d.pico.at)} <span className="text-text-3">({d.pico.n})</span></> : '—'}
+                    </td>
+                    {/* Por encima de un tercio de la fila inscribiéndose en la
+                        fila, el número deja de ser un dato y pasa a ser el
+                        hallazgo del reporte. Se marca. */}
+                    <td className="py-2 text-right tabular-nums">
+                      <span className={d.pctEnPuerta >= 35 ? 'text-warning font-semibold' : 'text-text-2'}>
+                        {d.pctEnPuerta}%
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            </div>
+            <p className="text-[11px] text-text-3 mt-2 leading-relaxed">
+              «En la puerta» son quienes se registraron menos de 15 minutos antes de entrar: una estimación a
+              partir de la hora de registro y la de ingreso, no una medición de la fila.
+            </p>
           </Bloque>
         )}
 

@@ -55,6 +55,9 @@ export default function EtiquetadoraSection({ evento }) {
   const [imprimiendoPng, setImprimiendoPng] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filtro, setFiltro] = useState('');
+  /* Los campos del formulario que son un documento, para poder buscar por
+     cédula. Ver `traerTodo`. */
+  const [camposDoc, setCamposDoc] = useState([]);
   const [sel, setSel] = useState(new Set());
   /* Las dos preguntas del mostrador: «¿a quién le falta la escarapela?» y
      «¿quién se registró hoy?». Se responden sobre la lista que ya está en
@@ -80,7 +83,18 @@ export default function EtiquetadoraSection({ evento }) {
   const traerTodo = useCallback(() => {
     setLoading(true);
     return clientesApi.listarTodos(evento.id)
-      .then(d => setClientes(d.clientes || d.tickets || []))
+      .then(d => {
+        setClientes(d.clientes || d.tickets || []);
+        /* Cuáles de las preguntas del formulario son un documento. Se
+           reconocen por el TIPO y no porque se llamen «Cédula»: cada
+           organizador las titula a su manera —«Documento de Identidad»,
+           «CC / TI»— y adivinar por el texto es acertar en un evento y fallar
+           en el siguiente. Viene en la misma respuesta, así que no cuesta
+           nada. */
+        setCamposDoc((d.campos_formulario || [])
+          .filter(c => c?.tipo === 'documento' && c?.id)
+          .map(c => c.id));
+      })
       .finally(() => setLoading(false));
   }, [evento.id]);
 
@@ -108,9 +122,18 @@ export default function EtiquetadoraSection({ evento }) {
        segundos. El botón «Actualizar» está para quien no quiere esperar. */
   useSondeo(mirarNuevos, 60000);
 
-  /* Busca por nombre, correo, código y tipo: en la puerta se busca por lo que
-     la persona dice o por lo que trae escrito, y quien está imprimiendo no
-     tiene por qué saber por cuál de los cuatro va a encontrarla. */
+  /* Busca por nombre, correo, código, tipo y DOCUMENTO: en la puerta se busca
+     por lo que la persona dice o por lo que trae escrito, y quien está
+     imprimiendo no tiene por qué saber por cuál va a encontrarla.
+     El documento se añadió porque es lo que la gente dice al llegar al
+     mostrador —su cédula, no su correo—, y sin esto había que buscarla por el
+     nombre, con los homónimos y las tildes que eso arrastra. En FESTECH lo
+     respondieron 4.481 de 4.485 boletas.
+     Aquí la coincidencia es por trozo, igual que en todo lo demás: esta lista
+     ya está entera en el navegador de quien tiene permiso para verla, así que
+     hacer que el documento se comporte distinto del nombre sólo sorprendería.
+     En el servidor —la búsqueda de la pestaña Clientes— sí es exacta, porque
+     allí el documento decide qué filas salen de la base. */
   /* El corte de «hoy» y «este mes» se calcula en la hora del EVENTO: en la
      puerta, a las siete de la mañana en Ibagué, «hoy» no puede empezar a
      depender de la zona horaria del portátil de quien imprime. */
@@ -138,11 +161,12 @@ export default function EtiquetadoraSection({ evento }) {
         if (cuando === 'mes' && !dia.startsWith(mes)) return false;
       }
       if (!palabras.length) return true;
-      const t = [c.guest_nombre, c.usuario?.nombre, c.guest_email, c.usuario?.email, c.codigo, c.tipo?.nombre]
+      const t = [c.guest_nombre, c.usuario?.nombre, c.guest_email, c.usuario?.email, c.codigo, c.tipo?.nombre,
+        ...camposDoc.map(id => c.respuestas?.[id])]
         .filter(Boolean).join(' ').toLowerCase();
       return palabras.every(w => t.includes(w));
     });
-  }, [clientes, filtro, verImpresas, cuando, diaDe]);
+  }, [clientes, filtro, verImpresas, cuando, diaDe, camposDoc]);
 
   /* Cuántas van y cuántas faltan, que es lo que se pregunta cada media hora en
      el mostrador. Sale de la lista completa, no de lo filtrado. */
@@ -587,7 +611,7 @@ export default function EtiquetadoraSection({ evento }) {
 
         <div className="flex items-center justify-between gap-3 flex-wrap no-print">
           <div className="flex items-center gap-2">
-            <input className="input !h-9 w-64" placeholder="Buscar por nombre, correo o código…"
+            <input className="input !h-9 w-64" placeholder="Nombre, cédula, correo o código…"
               value={filtro} onChange={e => setFiltro(e.target.value)} />
             <button onClick={todos} className="btn-ghost btn-sm">
               {sel.size === filas.length && filas.length ? 'Quitar selección' : `Seleccionar ${filas.length}`}
