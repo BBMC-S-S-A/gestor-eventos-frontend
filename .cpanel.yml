@@ -2,6 +2,16 @@
 # Despliegue en cPanel (Git Version Control → "Deploy HEAD Commit").
 # Construye el frontend (Vite) y copia el resultado a la carpeta pública.
 #
+# ⚠️ ÉSTE ES EL CAMINO VIEJO, y sólo vale si cPanel sigue apuntando a `main`.
+#
+# El camino de ahora es la rama `deploy`: GitHub Actions construye el sitio
+# (`.github/workflows/publicar.yml`) y deja el resultado ya compilado ahí, y
+# cPanel sólo copia (`deploy/cpanel.yml`). Segundos en vez de minutos, y sin
+# el build que se quedaba sin memoria — el fallo contado más abajo.
+#
+# Este archivo se queda funcionando a propósito: si algún día hay que volver a
+# apuntar cPanel a `main`, esto sigue sirviendo.
+#
 # ⚠️ REVISA ESTO ANTES DE DESPLEGAR:
 #   DEPLOYPATH = carpeta pública de tu dominio en cPanel.
 #     · Dominio principal:  /home/TU_USUARIO/public_html
