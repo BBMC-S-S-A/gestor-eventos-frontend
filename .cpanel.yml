@@ -1,0 +1,53 @@
+---
+# El `.cpanel.yml` de la rama `deploy`, NO el de `main`.
+#
+# Este archivo no se usa desde aquí: el workflow `publicar.yml` lo copia a la
+# raíz de la rama `deploy` en cada build. Vive en `main` para que se pueda
+# revisar y cambiar como cualquier otro archivo del proyecto — una rama que se
+# reescribe entera en cada publicación no es sitio para editar nada.
+#
+# ── Qué cambia respecto al de antes ───────────────────────────────────────
+#
+# El `.cpanel.yml` de `main` hacía tres cosas: `npm ci`, `npm run build` y
+# copiar. Éste hace sólo la tercera, porque la rama `deploy` ya trae el sitio
+# construido dentro de `dist/`.
+#
+# Eso quita de en medio el fallo del 16 de septiembre, que está contado con
+# detalle en el archivo viejo: el build se quedaba sin memoria —el gestor de
+# tareas de cPanel corre más apretado que una sesión de Terminal—, salía con
+# código 1, el `&&` cortaba la cadena y la copia no llegaba a ejecutarse. El
+# panel decía verde y la carpeta pública seguía con lo de la vez anterior.
+#
+# Aquí no hay nada que pueda quedarse sin memoria: es un `cp`.
+#
+# ── Revisa esto si cambias de dominio ─────────────────────────────────────
+#
+#   DEPLOYPATH = carpeta pública del dominio en cPanel.
+#     · Dominio principal:  /home/TU_USUARIO/public_html
+#     · Subdominio/addon:   /home/TU_USUARIO/nombre.tudominio.com
+#   $HOME ya apunta a /home/TU_USUARIO.
+
+deployment:
+  tasks:
+    - export DEPLOYPATH=$HOME/public_html
+    # `dist/.` y no `dist/*`: el punto incluye los ocultos, y ahí está el
+    # `.htaccess` sin el cual cualquier ruta que no sea la raíz da 404 al
+    # recargar.
+    #
+    # Se copia ENCIMA, sin borrar antes. A propósito: los bundles llevan el
+    # hash en el nombre, así que los viejos no estorban, y dejarlos un rato
+    # evita que a quien tenga la página abierta se le caiga un trozo a medio
+    # cargar. Lo que sí conviene es limpiar `assets/` de vez en cuando.
+    #
+    # `-f` y no `cp` a secas. En la cuenta, `cp` está aliasado a `cp -i`, que
+    # pregunta antes de sobrescribir archivo por archivo. Un shell no
+    # interactivo no suele expandir alias, así que aquí probablemente no
+    # pasaría — pero «probablemente» no vale para el paso que publica: si un
+    # día se expande, la tarea se queda esperando una respuesta que nadie va a
+    # dar y acaba igual que el fallo del 16 de septiembre, con el panel en
+    # verde y la carpeta pública sin tocar. `-f` va después de cualquier `-i`
+    # y lo anula.
+    #
+    # Pasó de verdad, copiando a mano: `cp: overwrite '…/.htaccess'?` y la
+    # copia quedó a medias.
+    - /bin/bash -lc 'cd "$HOME/gestek-frontend" && mkdir -p "$DEPLOYPATH" && cp -Rf dist/. "$DEPLOYPATH"/'

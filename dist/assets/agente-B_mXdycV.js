@@ -1,0 +1,1 @@
+import{c as a}from"./index-DjR6rtpf.js";const g={estado:()=>a.get("/me/agente/estado").then(e=>e.data),chat:(e,t)=>a.post("/me/agente/chat",{mensajes:e,archivos:t},{timeout:12e4}).then(n=>n.data),generarEvento:e=>a.post("/me/agente/generar-evento",{descripcion:e}).then(t=>t.data)};export{g as a};

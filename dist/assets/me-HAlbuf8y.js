@@ -1,0 +1,1 @@
+import{c as e}from"./index-DjR6rtpf.js";const s={perfil:()=>e.get("/me").then(t=>t.data),actualizar:t=>e.patch("/me",t).then(a=>a.data),boletas:()=>e.get("/me/boletas").then(t=>t.data),expositor:()=>e.get("/me/expositor").then(t=>t.data),transferir:(t,a)=>e.post(`/me/boletas/${t}/transferir`,a).then(r=>r.data)};export{s as m};

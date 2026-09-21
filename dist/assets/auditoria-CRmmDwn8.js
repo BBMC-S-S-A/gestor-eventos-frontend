@@ -1,0 +1,1 @@
+import{c as r}from"./index-DjR6rtpf.js";import"./vendor-react-DcDGR-26.js";import"./vendor-router-BTEfW47N.js";import"./vendor-8Va9yT17.js";import"./vendor-supabase-q4idO1eT.js";const s={list:(t,i={})=>r.get(`/eventos/${t}/auditoria`,{params:i}).then(o=>o.data)};export{s as auditoriaApi};

@@ -1,0 +1,2 @@
+function e(r){return`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm transition-colors
+          flex-shrink-0 whitespace-nowrap border ${r?"text-text-1 font-medium":"border-transparent text-text-2 hover:text-text-1"}`}function n(r){return r?{borderColor:"color-mix(in srgb, var(--brand-primary, #C9A227) 55%, transparent)",background:"color-mix(in srgb, var(--brand-primary, #C9A227) 12%, transparent)"}:void 0}export{e as c,n as e};

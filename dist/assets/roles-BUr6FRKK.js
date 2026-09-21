@@ -1,0 +1,1 @@
+import{c as r}from"./index-DjR6rtpf.js";const n={list:e=>r.get(`/eventos/${e}/roles`).then(t=>t.data),crear:(e,t)=>r.post(`/eventos/${e}/roles`,t).then(o=>o.data),editar:(e,t,o)=>r.patch(`/eventos/${e}/roles/${t}`,o).then(a=>a.data),borrar:(e,t)=>r.delete(`/eventos/${e}/roles/${t}`).then(o=>o.data)};export{n as r};
