@@ -38,4 +38,16 @@ deployment:
     # hash en el nombre, así que los viejos no estorban, y dejarlos un rato
     # evita que a quien tenga la página abierta se le caiga un trozo a medio
     # cargar. Lo que sí conviene es limpiar `assets/` de vez en cuando.
-    - /bin/bash -lc 'cd "$HOME/gestek-frontend" && mkdir -p "$DEPLOYPATH" && cp -R dist/. "$DEPLOYPATH"/'
+    #
+    # `-f` y no `cp` a secas. En la cuenta, `cp` está aliasado a `cp -i`, que
+    # pregunta antes de sobrescribir archivo por archivo. Un shell no
+    # interactivo no suele expandir alias, así que aquí probablemente no
+    # pasaría — pero «probablemente» no vale para el paso que publica: si un
+    # día se expande, la tarea se queda esperando una respuesta que nadie va a
+    # dar y acaba igual que el fallo del 16 de septiembre, con el panel en
+    # verde y la carpeta pública sin tocar. `-f` va después de cualquier `-i`
+    # y lo anula.
+    #
+    # Pasó de verdad, copiando a mano: `cp: overwrite '…/.htaccess'?` y la
+    # copia quedó a medias.
+    - /bin/bash -lc 'cd "$HOME/gestek-frontend" && mkdir -p "$DEPLOYPATH" && cp -Rf dist/. "$DEPLOYPATH"/'
