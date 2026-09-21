@@ -25,6 +25,7 @@ import FacturacionSection  from './comercial/FacturacionSection.jsx';
 import PromocionesSection  from './comercial/PromocionesSection.jsx';
 import AccesosSection     from './asistentes/AccesosSection.jsx';
 import AforoSection       from './asistentes/AforoSection.jsx';
+import IngresosPorHoraSection from './asistentes/IngresosPorHoraSection.jsx';
 import AcreditacionSection from './asistentes/AcreditacionSection.jsx';
 import PreviosSection      from './asistentes/PreviosSection.jsx';
 import DocumentosSection    from './DocumentosSection.jsx';
@@ -260,6 +261,11 @@ const SECCIONES = [
        lista de espera aunque el servidor ya se la aceptara. `PreviosSection`
        decide dentro cuál de las dos vistas enseña. */
     { id: 'previos',      label: 'Invitaciones',        perm: ['editar_evento', 'gestionar_clientes', 'gestionar_padron'] },
+    /* El informe de la puerta. Va aqui y no en «Aforo por zonas» porque aquello
+       cuenta las zonas de DENTRO y esto cuenta la entrada, que es otra pregunta
+       y la hace otra persona. Permiso de `ver_clientes`: lee la lista de
+       boletas entera, que es justo lo que ese permiso protege. */
+    { id: 'porhora',      label: 'Ingresos por hora',   perm: 'ver_clientes' },
   ]},
   { id: 'equipo', label: 'Equipo y tareas', icon: UsersIcon, tabs: [
     { id: 'equipo',      label: 'Equipo y roles', perm: ['gestionar_roles', 'invitar_staff', 'remover_miembros'] },
@@ -779,6 +785,7 @@ function Contenido({ seccion, tab, evento, soyOwner, reload, permisos, onAnuncio
                                         puedeBorrar={puedeVer('borrar_boletas', soyOwner, permisos)} />;
     case 'asistentes/checkin'       : return <CheckinTab evento={evento} miRolId={miRolId} miUserId={miUserId} permisos={permisos} soyOwner={soyOwner} />;
     case 'asistentes/acreditados'   : return <AcreditadosTab evento={evento} />;
+    case 'asistentes/porhora'       : return <IngresosPorHoraSection evento={evento} />;
     /* Esta pantalla toca tres cosas con tres permisos distintos (la zona, la
        agenda y los stands), así que recibe la lista y decide ella: la regla de
        cada acción vive junto a la acción. */
