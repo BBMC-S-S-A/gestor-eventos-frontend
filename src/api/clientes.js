@@ -98,9 +98,6 @@ export const clientesApi = {
   /* El estado en vivo de todo lo que hay puesto en el plano: aforo de las
      zonas, ingresos por cada puerta e inscripción de cada sub-evento. */
   mapaVivo     : (eventoId)                      => client.get(`/eventos/${eventoId}/mapa/vivo`).then(r => r.data),
-  /* Lo que NO entró por la puerta y por qué. La fila no se frena con quien
-     pasa: se frena con quien hay que atender y rechazar. */
-  rechazosPuerta: (eventoId, params = {})        => client.get(`/eventos/${eventoId}/puerta/rechazos`, { params }).then(r => r.data),
   alertas      : (eventoId, params = {})         => client.get(`/eventos/${eventoId}/alertas`, { params }).then(r => r.data),
   reportarAlerta: (eventoId, body)               => client.post(`/eventos/${eventoId}/alertas`, body).then(r => r.data),
   resolverAlerta: (eventoId, id)                 => client.patch(`/eventos/${eventoId}/alertas/${id}/resolver`).then(r => r.data),
