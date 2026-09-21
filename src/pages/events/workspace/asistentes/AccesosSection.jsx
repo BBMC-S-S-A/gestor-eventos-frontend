@@ -12,7 +12,6 @@ import { zonasDelEvento, etiquetaZona } from '../../../../lib/zonas.js';
 import { miembrosDelEvento } from '../../../../lib/equipo.js';
 import { rolesApi } from '../../../../api/roles.js';
 import SelectorDePersonas from '../../../../components/ui/SelectorDePersonas.jsx';
-import RechazosDeLaPuerta from './RechazosDeLaPuerta.jsx';
 
 /* Asistentes · Accesos — control de ingresos por puerta.
    El organizador define cuántas entradas hay, qué tipos de boleta admite cada
@@ -325,12 +324,6 @@ export default function AccesosSection({ evento }) {
       </div>
 
       <button onClick={agregar} className="btn-ghost btn-sm">+ Añadir puerta</button>
-
-      {/* Lo que NO entró. Va aquí, debajo de las puertas, porque es lo que
-          esas puertas rechazaron: el informe de ingresos cuenta a quien pasó y
-          se queda corto justo donde se formó la cola. Se pinta solo si hay
-          algo que enseñar. */}
-      <RechazosDeLaPuerta evento={evento} />
 
       {/* ── Las zonas se fueron a su propia pantalla ──
           Estaban aquí porque una zona y una puerta se configuraban juntas, y

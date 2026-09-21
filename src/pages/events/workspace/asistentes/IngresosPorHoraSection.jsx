@@ -65,11 +65,6 @@ export default function IngresosPorHoraSection({ evento }) {
   const [filas, setFilas]   = useState(null);
   const [total, setTotal]   = useState(0);
   const [franja, setFranja] = useState(15);
-  /* Lo que NO entró, en las mismas franjas. Se pide aparte y se vuelve a pedir
-     al cambiar la franja: es una respuesta pequeña —un número por franja— y
-     así los cubos los calcula el servidor con el mismo `floor(t/ms)*ms` que
-     aquí, que es lo que hace que las dos curvas encajen exactamente. */
-  const [rechazos, setRechazos] = useState(null);
 
   useEffect(() => {
     let vivo = true;
@@ -83,36 +78,10 @@ export default function IngresosPorHoraSection({ evento }) {
     return () => { vivo = false; };
     /* eslint-disable-next-line */
   }, [evento.id]);
-
-  useEffect(() => {
-    let vivo = true;
-    clientesApi.rechazosPuerta(evento.id, { intervalo: franja })
-      .then(d => { if (vivo) setRechazos(d); })
-      /* Sin rechazos el informe sigue siendo el informe: esto se suma encima,
-         no lo sostiene. Un backend sin la ruta todavía no puede dejar la
-         pantalla en blanco. */
-      .catch(() => { if (vivo) setRechazos(null); });
-    return () => { vivo = false; };
-  }, [evento.id, franja]);
-
   /* El informe entero, por día. Se recalcula sólo al cambiar la franja. El
      cálculo vive en `lib/ingresosPorHora.js` porque el reporte imprimible usa
      el mismo: dos copias serían dos informes que pueden discrepar. */
   const dias = useMemo(() => resumenPorDia(filas, franja), [filas, franja]);
-
-  /* Los rechazos, agrupados por día y por franja, listos para que cada día
-     encuentre los suyos sin recorrer la lista entera. */
-  const rechPorDia = useMemo(() => {
-    const m = new Map();
-    for (const p of rechazos?.curva || []) {
-      const at = new Date(p.at);
-      if (Number.isNaN(at.getTime())) continue;
-      const clave = at.toDateString();
-      if (!m.has(clave)) m.set(clave, new Map());
-      m.get(clave).set(at.getTime(), p.n);
-    }
-    return m;
-  }, [rechazos]);
 
   const tot = useMemo(() => dias.reduce((a, d) => ({
     ingresos  : a.ingresos + d.ingresos,
@@ -175,24 +144,11 @@ export default function IngresosPorHoraSection({ evento }) {
             <Caja label="Se registraron en la puerta" valor={`${pct(tot.enPuerta, filas.length)}%`}
               nota={`${tot.enPuerta.toLocaleString('es-CO')} personas`}
               tono={pct(tot.enPuerta, filas.length) >= 35 ? 'alerta' : null} />
-            {rechazos?.total > 0 ? (
-              /* Cuando hay rechazos ocupan la cuarta caja: son la parte de la
-                 fila que este informe no contaba y la que explica por qué se
-                 tardaba más de lo que dicen las entradas. Los reingresos
-                 siguen a la vista en la línea de cada día. */
-              <Caja label="No entraron al primer intento" valor={rechazos.total.toLocaleString('es-CO')}
-                nota={`1 de cada ${Math.max(1, Math.round(tot.ingresos / rechazos.total))} escaneos`}
-                tono="alerta" />
-            ) : (
-              <Caja label="Reingresos" valor={tot.reingresos.toLocaleString('es-CO')}
-                nota="volvieron otro día" />
-            )}
+            <Caja label="Reingresos" valor={tot.reingresos.toLocaleString('es-CO')}
+              nota="volvieron otro día" />
           </div>
 
-          {dias.map(d => (
-            <DiaBloque key={d.fecha.toDateString()} d={d} franja={franja}
-              rechazos={rechPorDia.get(d.fecha.toDateString()) || null} />
-          ))}
+          {dias.map(d => <DiaBloque key={d.fecha.toDateString()} d={d} franja={franja} />)}
 
           {/* El aviso que evita leer de más. Sin esto, el 46% de «en la puerta»
               se lee como si fuera exacto, y no lo es: es lo que se puede
@@ -219,14 +175,8 @@ function Caja({ label, valor, nota, tono }) {
   );
 }
 
-function DiaBloque({ d, franja, rechazos }) {
+function DiaBloque({ d, franja }) {
   const max = d.curva.reduce((m, p) => Math.max(m, p.n), 0) || 1;
-  /* El total del día y su máximo por franja, de una pasada. Estaban los dos
-     dentro del bucle de las barras, que es recorrer el mapa entero cien
-     veces para pintar cien columnas. */
-  const [rechDelDia, maxRech] = rechazos
-    ? [...rechazos.values()].reduce(([suma, mx], n) => [suma + n, Math.max(mx, n)], [0, 0])
-    : [0, 0];
   return (
     <div className="card">
       <div className="card-header flex items-center justify-between flex-wrap gap-2">
@@ -235,7 +185,6 @@ function DiaBloque({ d, franja, rechazos }) {
           <p className="text-xs text-text-3">
             {d.ingresos.toLocaleString('es-CO')} entradas · de {HORA(d.primera)} a {HORA(d.ultima)}
             {d.reingresos > 0 && ` · ${d.reingresos} reingresos`}
-            {rechDelDia > 0 && <> · <span className="text-warning">{rechDelDia} rechazos</span></>}
           </p>
         </div>
         <div className="flex items-center gap-4 text-right">
@@ -264,28 +213,6 @@ function DiaBloque({ d, franja, rechazos }) {
             />
           ))}
         </div>
-        {/* Los rechazos, pegados debajo y en las mismas columnas.
-            Debajo y no mezclados con las entradas a propósito: son otra cosa
-            —gente que NO pasó— y apilarlos encima haría leer una barra alta
-            como si hubiera entrado más gente, que es justo al revés.
-            La escala es la suya, no la de las entradas: lo que se quiere ver
-            es DÓNDE se concentraron, y contra un pico de 400 entradas nueve
-            rechazos serían un píxel. */}
-        {rechDelDia > 0 && (
-          <div className="flex items-start gap-px h-8 overflow-x-auto mt-0.5"
-            role="img" aria-label={`${rechDelDia} rechazos de la puerta, por franja`}>
-            {d.curva.map(p => {
-              const n = rechazos.get(p.at.getTime()) || 0;
-              return (
-                <div key={p.at.getTime()}
-                  className={`flex-1 min-w-[3px] rounded-b ${n ? 'bg-warning/70' : ''}`}
-                  style={{ height: n ? `${Math.max(12, 100 * n / (maxRech || 1))}%` : '0' }}
-                  title={n ? `${HORA(p.at)} — ${n} ${n === 1 ? 'rechazo' : 'rechazos'}` : undefined}
-                />
-              );
-            })}
-          </div>
-        )}
         <div className="flex justify-between text-[11px] text-text-3 mt-1.5">
           <span>{HORA(d.primera)}</span>
           <span>{HORA(d.ultima)}</span>
