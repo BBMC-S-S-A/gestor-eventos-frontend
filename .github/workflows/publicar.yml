@@ -1,0 +1,111 @@
+# Dejar el sitio YA CONSTRUIDO en la rama `deploy`, para que cPanel sólo copie.
+#
+# ── El problema que resuelve ──────────────────────────────────────────────
+#
+# Hasta ahora cPanel hacía el trabajo entero en cada despliegue: `npm ci` con
+# 562 paquetes, `npm run build` con 865 módulos, y después copiar. Los dos
+# primeros pasos tardan 13 y 16 segundos en un portátil; en el gestor de
+# tareas de cPanel, con el tope de 512 MB que hubo que ponerle, son minutos.
+#
+# Y el 16 de septiembre ni siquiera terminaron: el build se quedó sin memoria,
+# salió con código 1, el `&&` cortó la cadena y la tarea de copiar nunca corrió
+# — con el panel en verde y la carpeta pública sirviendo lo de la vez anterior.
+# Está contado en `deploy/cpanel.yml`.
+#
+# El único paso que de verdad tiene que ocurrir en el servidor es el tercero.
+# Así que el build se hace aquí, donde hay memoria y caché, y a cPanel le llega
+# una rama que ya contiene el sitio compilado. El despliegue pasa a ser una
+# copia de archivos: segundos, y sin nada que pueda quedarse sin memoria.
+#
+# ── Por qué cuelga de «Pruebas» y no del push ─────────────────────────────
+#
+# `workflow_run` con `conclusion == 'success'` significa que esto NO corre si
+# las pruebas fallaron. Colgarlo del push a `main` directamente publicaría
+# también los commits rojos, y entonces tener pruebas no serviría de nada: el
+# sitio saldría igual. Lo que protege `main` tiene que proteger también lo que
+# se publica.
+#
+# ── Por qué se fuerza la rama en vez de acumular commits ──────────────────
+#
+# La rama `deploy` no es historia, es un estado: lo que tiene que haber en el
+# servidor ahora mismo. Guardar cada build haría crecer el repositorio con
+# bundles que nadie va a mirar nunca — y el historial de verdad, el que dice
+# por qué cambió cada cosa, está en `main`.
+
+name: Publicar
+
+on:
+  workflow_run:
+    workflows: ["Pruebas"]
+    types: [completed]
+    branches: [main]
+  # Para volver a publicar sin tocar código: por ejemplo si el servidor se
+  # quedó a medias y hay que rehacer la rama.
+  workflow_dispatch:
+
+jobs:
+  publicar:
+    # Sin esto, un `main` en rojo se publicaría igual.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      # Para poder empujar la rama `deploy`. Es el único permiso que necesita.
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # El commit EXACTO que pasó las pruebas, no lo que haya en main
+          # cuando esto arranque: entre una cosa y otra puede entrar otro merge,
+          # y entonces se publicaría algo que nadie probó.
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Instalar
+        run: npm ci
+
+      - name: Construir
+        run: npm run build
+
+      # El sitio va dentro de `dist/` TAMBIÉN en la rama `deploy`, y no en la
+      # raíz. Si estuviera en la raíz, la tarea de cPanel tendría que copiar la
+      # carpeta del repositorio entera y se llevaría `.git` y el propio
+      # `.cpanel.yml` a la carpeta pública. Con `dist/` dentro, la tarea es la
+      # misma línea que ya se usaba y no hay nada que excluir.
+      - name: Armar la rama deploy
+        run: |
+          mkdir -p publicar/dist
+          # `dist/.` y no `dist/*`: el punto incluye los ocultos, y ahí está el
+          # `.htaccess` que hace que las rutas de la aplicación no den 404.
+          cp -R dist/. publicar/dist/
+          cp deploy/cpanel.yml publicar/.cpanel.yml
+          test -f publicar/dist/.htaccess || { echo "Falta .htaccess en dist"; exit 1; }
+          test -f publicar/dist/index.html || { echo "Falta index.html en dist"; exit 1; }
+
+      - name: Empujar la rama deploy
+        run: |
+          cd publicar
+          git init -q -b deploy
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -q -m "Sitio construido desde ${SHA::7}"
+          git push -f "https://x-access-token:${TOKEN}@github.com/${REPO}.git" deploy
+        env:
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Qué quedó publicado
+        run: |
+          echo "Commit de origen: ${SHA}"
+          echo "Bundle principal:"
+          grep -oE 'src="/assets/[^"]+"' dist/index.html || true
+          echo "Comprobar después del despliegue en cPanel:"
+          echo "  curl -s https://gestekeventost.dpdns.org/ | grep -oE 'src=\"/assets/[^\"]+\"'"
+        env:
+          SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
