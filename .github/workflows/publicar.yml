@@ -71,6 +71,13 @@ jobs:
       - name: Construir
         run: npm run build
 
+      # La rama lleva su propio `.gitignore`, y no es un detalle: cPanel se
+      # niega a desplegar si hay «cambios sin commitear», y cuenta como tales
+      # los archivos SIN TRACKEAR. En la carpeta del servidor viven `.env` y
+      # `node_modules/` —que en `main` estaban ignorados y aquí no había nada
+      # que los ignorara—, así que el botón de desplegar salía deshabilitado
+      # sin decir por qué.
+      #
       # El sitio va dentro de `dist/` TAMBIÉN en la rama `deploy`, y no en la
       # raíz. Si estuviera en la raíz, la tarea de cPanel tendría que copiar la
       # carpeta del repositorio entera y se llevaría `.git` y el propio
@@ -83,6 +90,7 @@ jobs:
           # `.htaccess` que hace que las rutas de la aplicación no den 404.
           cp -R dist/. publicar/dist/
           cp deploy/cpanel.yml publicar/.cpanel.yml
+          cp deploy/gitignore publicar/.gitignore
           test -f publicar/dist/.htaccess || { echo "Falta .htaccess en dist"; exit 1; }
           test -f publicar/dist/index.html || { echo "Falta index.html en dist"; exit 1; }
 
