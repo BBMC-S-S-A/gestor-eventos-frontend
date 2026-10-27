@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { supabase } from '../../lib/supabase.js';
+import { subirArchivo } from '../../lib/subirArchivo.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { auth } from '../../lib/sesion.js';
 
@@ -23,19 +23,15 @@ export async function uploadEventImage(file, ownerId, prefix = 'cover') {
   const uid = session?.user?.id;
 
   if (uid) {
-    const path = `${uid}/${prefix}-${rand}.${ext}`;
-    const { error } = await supabase.storage.from('event-media')
-      .upload(path, file, { upsert: false, contentType: file.type });
-    if (error) throw new Error(error.message);
-    return supabase.storage.from('event-media').getPublicUrl(path).data.publicUrl;
+    const ruta = `${uid}/${prefix}-${rand}.${ext}`;
+    const { url } = await subirArchivo('event-media', file, { ruta, upsert: false });
+    return url;
   }
 
   const safe = String(ownerId || 'anon').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 40) || 'anon';
-  const path = `expositor/${safe}/${prefix}-${rand}.${ext}`;
-  const { error } = await supabase.storage.from('form-uploads')
-    .upload(path, file, { upsert: false, contentType: file.type });
-  if (error) throw new Error(error.message);
-  return supabase.storage.from('form-uploads').getPublicUrl(path).data.publicUrl;
+  const ruta = `expositor/${safe}/${prefix}-${rand}.${ext}`;
+  const { url } = await subirArchivo('form-uploads', file, { ruta, upsert: false });
+  return url;
 }
 
 export default function CoverUploader({ value, onChange, ownerId, label = 'Portada del evento' }) {

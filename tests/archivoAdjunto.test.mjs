@@ -20,21 +20,34 @@ const UP_LIMPIO = sinComentarios(UP);
 test('el navegador no elige el bucket: lo pregunta', () => {
   /* Si lo eligiera aquí, bastaría con no creérselo desde una consola: subir el
      documento al bucket público y guardar su URL. No fallaría nada y el
-     archivo quedaría con un enlace eterno dentro del Excel. */
+     archivo quedaría con un enlace eterno dentro del Excel.
+
+     La subida pasa ahora por `lib/subirArchivo.js` —la costura que decide
+     entre Supabase y el almacén propio—, así que el destino viaja como primer
+     argumento en vez de como `.from(...)`. Lo que se vigila es lo mismo: que
+     salga de `destino.bucket` y no de aquí. */
   assert.match(UP_LIMPIO, /eventosApi\.destinoDeArchivo\(slug, campo\.id, ext\)/);
-  assert.match(UP_LIMPIO, /\.from\(destino\.bucket\)/);
+  assert.match(UP_LIMPIO, /subirArchivo\(destino\.bucket,/);
   /* Y no hay ningún nombre de bucket escrito a mano. */
   assert.doesNotMatch(UP_LIMPIO, /'form-uploads/);
 });
 
 test('de un archivo privado no se pide la URL pública', () => {
   /* Ese bucket no la tiene: devolvería un enlace que no abre nada, que es peor
-     que no tenerlo porque parece que sí. */
-  const i = UP_LIMPIO.indexOf('if (destino.privado)');
-  assert.ok(i > 0, 'no distingue el privado');
-  const rama = UP_LIMPIO.slice(i, UP_LIMPIO.indexOf('} else', i));
-  assert.doesNotMatch(rama, /getPublicUrl/);
-  assert.match(rama, /privado:\$\{destino\.ruta\}/);
+     que no tenerlo porque parece que sí.
+
+     Ahora quien no la pide es la costura —`subirASupabase` con
+     `publico: false` devuelve `url: null`, y hay una prueba suya que lo fija—,
+     así que aquí se comprueba que el componente se lo DICE y que guarda la
+     ruta que de verdad se usó. Esto último importa con el almacén propio: la
+     ruta la decide el servidor, y guardar la que se pidió dejaría la ficha
+     apuntando a ningún sitio. */
+  assert.match(UP_LIMPIO, /publico\s*:\s*!destino\.privado/,
+    'ya no se le dice a la costura que ese destino es privado');
+  assert.match(UP_LIMPIO, /onChange\(`privado:\$\{subido\.ruta\}`\)/,
+    'ya no se guarda la ruta que devolvió la subida');
+  assert.doesNotMatch(UP_LIMPIO, /getPublicUrl/,
+    'el componente volvió a pedir la URL pública por su cuenta');
 });
 
 test('el tope y los formatos los dice el servidor, y se avisan antes', () => {

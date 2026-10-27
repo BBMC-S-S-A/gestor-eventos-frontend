@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { supabase } from '../../../lib/supabase.js';
+import { subirArchivo, borrarArchivo } from '../../../lib/subirArchivo.js';
 import { eventosApi } from '../../../api/eventos.js';
 import { useToast } from '../../../context/ToastContext.jsx';
 import { confirmDialog } from '../../../components/ui/Confirm.jsx';
@@ -60,11 +60,19 @@ export default function DocumentosSection({ evento, puedeEditar = true }) {
       const { data: { session } } = await auth.getSession();
       const uid = session?.user?.id;
       if (!uid) throw new Error('Inicia sesión para subir documentos.');
-      const path = `${uid}/docs/${evento.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-      const { error: upErr } = await supabase.storage.from('event-media').upload(path, file, { upsert: false, contentType: file.type });
-      if (upErr) throw new Error(upErr.message);
-      const { data } = supabase.storage.from('event-media').getPublicUrl(path);
-      const doc = { nombre: sanitizarNombre(file.name), url: data.publicUrl, path, tipo: TIPOS_DOCUMENTO[file.type], size: file.size, subido_at: new Date().toISOString() };
+      const ruta = `${uid}/docs/${evento.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
+      const subido = await subirArchivo('event-media', file, {
+        ruta, upsert: false, eventoId: evento.id,
+      });
+      /* `path` y `archivoId` se guardan los DOS, y los dos son necesarios: el
+         `archivoId` sólo existe si lo subió el almacén propio, y es lo que
+         luego dice dónde vive el archivo a la hora de borrarlo. Los documentos
+         de antes del corte no lo tienen, y ésos se borran de Supabase. */
+      const doc = {
+        nombre: sanitizarNombre(file.name), url: subido.url, path: subido.ruta,
+        archivoId: subido.id || undefined,
+        tipo: TIPOS_DOCUMENTO[file.type], size: file.size, subido_at: new Date().toISOString(),
+      };
       await persistir([doc, ...docs]);
       success('Documento subido.');
     } catch (e) { error('Error al subir: ' + e.message); }
@@ -73,7 +81,16 @@ export default function DocumentosSection({ evento, puedeEditar = true }) {
 
   const eliminar = async (doc) => {
     if (!(await confirmDialog({ title: 'Eliminar documento', message: `¿Eliminar "${doc.nombre}"?`, confirmLabel: 'Eliminar', danger: true }))) return;
-    if (doc.path) { try { await supabase.storage.from('event-media').remove([doc.path]); } catch { /* noop */ } }
+    /* El borrado va por donde VIVE el archivo, no por la bandera: durante la
+       transición los dos almacenes tienen documentos, y guiarse por la bandera
+       borraría en el sitio equivocado — o sea, no borraría nada y diría que
+       sí. Lo decide `archivoId`: si está, es del almacén propio.
+       Sigue siendo best-effort: si el archivo no se va, la ficha sí, y un
+       huérfano se barre después; dejar la ficha sería peor. */
+    if (doc.archivoId || doc.path) {
+      try { await borrarArchivo({ carpeta: 'event-media', ruta: doc.path, id: doc.archivoId }); }
+      catch { /* noop */ }
+    }
     persistir(docs.filter(d => d !== doc));
   };
 
