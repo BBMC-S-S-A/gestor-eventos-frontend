@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { supabase } from '../../lib/supabase.js';
+import { subirArchivo } from '../../lib/subirArchivo.js';
 import { eventosApi } from '../../api/eventos.js';
 
 /* Adjuntar un archivo a un formulario: un PDF, un Word, una presentación.
@@ -57,20 +57,20 @@ export default function FormFileUploader({ value, onChange, slug, campo }) {
         throw new Error(`El archivo pesa ${(file.size / MB).toFixed(1)} MB y el máximo son ${Math.round(destino.max_bytes / MB)} MB.`);
       }
 
-      const { error } = await supabase.storage
-        .from(destino.bucket)
-        .upload(destino.ruta, file, { contentType: file.type });
-      if (error) throw new Error(error.message);
+      /* `destino.privado` lo decide el backend al dar el destino; la costura
+         devuelve `url: null` para lo privado por su cuenta. Se le pasa igual,
+         porque con Supabase es el navegador quien tiene que saber que de ese
+         bucket NO hay que pedir URL pública: devolvería un enlace que no abre
+         nada, que es peor que no tenerlo porque parece que sí. */
+      const subido = await subirArchivo(destino.bucket, file, {
+        ruta   : destino.ruta,
+        publico: !destino.privado,
+      });
 
-      if (destino.privado) {
-        /* Ni siquiera se pide la URL pública: ese bucket no la tiene, y pedirla
-           devolvería un enlace que no abre nada — que es peor que no tenerlo,
-           porque parece que sí. */
-        onChange(`privado:${destino.ruta}`);
-      } else {
-        const { data } = supabase.storage.from(destino.bucket).getPublicUrl(destino.ruta);
-        onChange(data.publicUrl);
-      }
+      /* La ruta que vale es la que devuelve la costura, no la que se pidió:
+         con el almacén propio la decide el servidor. */
+      if (destino.privado || !subido.url) onChange(`privado:${subido.ruta}`);
+      else onChange(subido.url);
       setNombreLocal(file.name);
     } catch (e) {
       setErr(e.response?.data?.error || e.message || 'No se pudo subir el archivo.');

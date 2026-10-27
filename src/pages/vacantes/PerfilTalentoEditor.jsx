@@ -4,7 +4,7 @@ import { vacantesApi } from '../../api/vacantes.js';
 import { useToast } from '../../context/ToastContext.jsx';
 import { useI18n } from '../../context/I18nContext.jsx';
 import { useAuth } from '../../context/AuthContext.jsx';
-import { supabase } from '../../lib/supabase.js';
+import { subirArchivo } from '../../lib/subirArchivo.js';
 import { validarArchivo, sanitizarNombre, TIPOS_CV, MAX_CV, ACCEPT_CV } from '../../lib/archivos.js';
 import Spinner from '../../components/ui/Spinner.jsx';
 import GLoader from '../../components/ui/GLoader.jsx';
@@ -103,11 +103,10 @@ export default function PerfilTalentoEditor() {
       const ext = (file.name.split('.').pop() || 'pdf').toLowerCase();
       /* La carpeta raíz debe ser el uid (política de Storage). */
       const ruta = `${uid}/cv-${Date.now()}.${ext}`;
-      const { error } = await supabase.storage.from('form-uploads')
-        .upload(ruta, file, { cacheControl: '3600', upsert: false, contentType: file.type });
-      if (error) throw error;
-      const { data } = supabase.storage.from('form-uploads').getPublicUrl(ruta);
-      set({ cv_url: data.publicUrl, cv_nombre: sanitizarNombre(file.name) });
+      const { url } = await subirArchivo('form-uploads', file, {
+        ruta, cacheControl: '3600', upsert: false,
+      });
+      set({ cv_url: url, cv_nombre: sanitizarNombre(file.name) });
       success(t('Hoja de vida cargada. Recuerda guardar el perfil.'));
     } catch (e) { toastErr(e.message); }
     finally {

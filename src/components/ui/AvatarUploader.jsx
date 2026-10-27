@@ -1,5 +1,5 @@
 import { useRef, useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase.js';
+import { subirArchivo } from '../../lib/subirArchivo.js';
 import { useToast } from '../../context/ToastContext.jsx';
 
 /* Avatar grande con click-to-upload + hover overlay.
@@ -18,13 +18,12 @@ const ACCEPTED  = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
 export async function uploadAvatarFile(file, userId) {
   const ext  = file.name.split('.').pop().toLowerCase();
-  const path = `${userId}/avatar-${Date.now()}.${ext}`;
-  const { error } = await supabase.storage
-    .from('avatars')
-    .upload(path, file, { upsert: true, contentType: file.type });
-  if (error) throw new Error(error.message);
-  const { data } = supabase.storage.from('avatars').getPublicUrl(path);
-  return data.publicUrl;
+  /* La ruta la necesita el camino de Supabase —su política exige que la
+     carpeta raíz sea el uid—. Con el almacén propio la decide el servidor,
+     que ya sabe quién eres por el token, y ésta se ignora. */
+  const ruta = `${userId}/avatar-${Date.now()}.${ext}`;
+  const { url } = await subirArchivo('avatars', file, { ruta, upsert: true });
+  return url;
 }
 
 export default function AvatarUploader({ value, onChange, userId, initials = '?', size = 96 }) {
