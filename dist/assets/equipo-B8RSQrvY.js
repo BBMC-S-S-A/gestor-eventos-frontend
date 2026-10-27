@@ -1,0 +1,1 @@
+import{c as a}from"./index-C6bwdIIt.js";const p={list:e=>a.get(`/eventos/${e}/equipo`).then(t=>t.data),invitar:(e,t)=>a.post(`/eventos/${e}/equipo`,t).then(o=>o.data),cambiarRol:(e,t,o)=>a.patch(`/eventos/${e}/equipo/${t}`,{rol_id:o}).then(i=>i.data),remover:(e,t)=>a.delete(`/eventos/${e}/equipo/${t}`).then(o=>o.data)};export{p as e};

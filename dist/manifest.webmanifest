@@ -1,0 +1,47 @@
+{
+  "name": "GESTEK Event OS",
+  "short_name": "GESTEK",
+  "description": "Plataforma SaaS de gestión de eventos con marca blanca.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#070C18",
+  "theme_color": "#0D1525",
+  "lang": "es",
+  "categories": ["business", "productivity", "events"],
+  "icons": [
+    {
+      "src": "/icon-192.svg",
+      "type": "image/svg+xml",
+      "sizes": "192x192",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable.svg",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Crear evento",
+      "short_name": "Nuevo",
+      "url": "/eventos/nuevo",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    },
+    {
+      "name": "Mis eventos",
+      "short_name": "Eventos",
+      "url": "/eventos",
+      "icons": [{ "src": "/icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+# El `.gitignore` de la rama `deploy`, NO el de `main`.
+#
+# El workflow `publicar.yml` lo copia a la raíz de esa rama en cada build. Se
+# llama `gitignore` sin punto para que aquí, en `main`, no ignore nada: si
+# tuviera el punto, git lo aplicaría a este repositorio y escondería el
+# `node_modules` de todo el mundo.
+#
+# ── Por qué hace falta ────────────────────────────────────────────────────
+#
+# cPanel se niega a desplegar si hay «cambios sin commitear», y cuenta como
+# tales los archivos SIN TRACKEAR. En la carpeta del servidor viven dos que no
+# se van a ir nunca:
+#
+#   .env           la configuración del sitio, que no está ni debe estar en git
+#   node_modules/  lo que dejó el build cuando cPanel todavía compilaba
+#
+# En `main` los dos estaban ignorados y no molestaban. La rama `deploy` la
+# genera Actions desde cero, así que no heredaba ningún `.gitignore` y esos dos
+# archivos aparecían como cambios pendientes: el botón «Deploy HEAD Commit»
+# salía deshabilitado, con un aviso que no dice cuál es el archivo culpable.
+#
+# ── Lo que NO hay que hacer ───────────────────────────────────────────────
+#
+# Borrarlos. El `.env` es la configuración del servidor y no está en ninguna
+# otra parte; `node_modules/` es inofensivo y ocupa disco, nada más. Se ignoran,
+# que es lo que ya eran antes.
+
+# La configuración del servidor. No está en git a propósito.
+.env
+.env.*
+
+# Lo que quedó de cuando el build corría aquí. Ya no se usa: la rama `deploy`
+# trae el sitio construido. Se puede borrar a mano cuando se quiera espacio.
+node_modules/
+
+# Rastros de aquella época, por si quedan.
+.npm/
+npm-debug.log*

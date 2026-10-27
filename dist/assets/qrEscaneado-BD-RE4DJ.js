@@ -1,0 +1,1 @@
+const c=/^[A-Z0-9]{4,16}$/i;function i(o){const t=String(o||"").trim(),r=t.match(/\/mi-ticket\/([A-Za-z0-9]+)/);if(r)return{codigo:r[1].toUpperCase()};const e=t.match(/\/p\/([A-Za-z0-9]+)/);return e?{codigo:e[1].toUpperCase()}:c.test(t)?{codigo:t.toUpperCase()}:{qr_token:t}}export{i as l};

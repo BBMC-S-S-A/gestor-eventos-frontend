@@ -1,0 +1,1 @@
+import{j as o,r as n}from"./vendor-react-DcDGR-26.js";function i({campos:p=[],render:s}){let t=null;return p.flatMap(r=>{const a=r.grupo&&r.grupo!==t;t=r.grupo||null;const e=o.jsx(n.Fragment,{children:s(r)},r.id);return a?[o.jsx("p",{className:"text-[11px] uppercase tracking-widest text-text-3 font-semibold pt-2",children:r.grupo},`grupo-${r.id}`),e]:[e]})}export{i as C};
